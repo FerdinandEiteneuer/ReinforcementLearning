@@ -1,5 +1,4 @@
 from tabular_agents.tabular_agent import TabularAgent
-from tabular_agents.envs import WindyGridWorld
 
 # specific agents
 from tabular_agents.mc_every_visit_agent import MonteCarloEveryVisitAgent

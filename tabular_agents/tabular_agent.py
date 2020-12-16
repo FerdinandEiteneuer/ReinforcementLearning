@@ -218,17 +218,7 @@ class TabularAgent:
         Picks the greedy action, given a state.
         """
 
-        if isinstance(self.Q, dict):
-            Qs = [self.Q[state, a] for a in self.A]
-            action = Qs.index(max(Qs))
-            return action
-        elif isinstance(self.Q, np.ndarray):
-            Qs = self.Q[state]
-            action = np.argmax(Qs)
-            return action
-        else:
-            raise TypeError("Unrecognized Type of actionvalue function.")
-
+        Q = self.Q.predict([state])[0]
 
     def print_actionvalue_function(self):
         """

@@ -191,14 +191,166 @@ class WindyGridWorld:
 
 class TicTacToe:
 
-    def __init__(self):
+    def __init__(self, player1=1, player2=2):
 
         self.action_space = gym.spaces.discrete.Discrete(9)
+        self.observation_size = gym.spaces.discrete.Discrete(9)
+
+        self.player1 = player1
+        self.player2 = player2
+
+        self.win_reward = 1
+        self.draw_reward = 0.5
+        self.loss_reward = 0
+
+        self.time_step_punishment = 0
+
+        self.reset()
+
+    def reset(self):
+
+        self.board = np.zeros(9)
+        self.t = 0
+
+        self.win_possibilities_player = {
+            'row1': {'squares': [0, 1, 2], 'count': 0},
+            'row2': {'squares': [3, 4, 5], 'count': 0},
+            'row3': {'squares': [6, 7, 8], 'count': 0},
+            'col1': {'squares': [0, 3, 6], 'count': 0},
+            'col2': {'squares': [1, 4, 7], 'count': 0},
+            'col3': {'squares': [2, 5, 8], 'count': 0},
+            'diag1': {'squares': [0, 4, 8], 'count': 0},
+            'diag2': {'squares': [6, 4, 2], 'count': 0},
+        }
+
+        self.win_possibilities_opponent = {
+            'row1': {'squares': [0, 1, 2], 'count': 0},
+            'row2': {'squares': [3, 4, 5], 'count': 0},
+            'row3': {'squares': [6, 7, 8], 'count': 0},
+            'col1': {'squares': [0, 3, 6], 'count': 0},
+            'col2': {'squares': [1, 4, 7], 'count': 0},
+            'col3': {'squares': [2, 5, 8], 'count': 0},
+            'diag1': {'squares': [0, 4, 8], 'count': 0},
+            'diag2': {'squares': [6, 4, 2], 'count': 0},
+        }
+        return self.board
+
+    def check_terminal(self):
+        """
+        [0,1,2,3,4,5,6,7,8] ->
+        [[0,1,2],
+         [3,4,5],
+         [6,7,8]]
+        """
+        return False, None
+        if self.t < 5:
+            return False, None
+        if self.t == 9:
+            return True, None
+
+        # horizontal
+        first_row = self.board[0:3]
+        if np.all(first_row == self.player1):
+            return True, self.player1
+        if np.all(first_row == self.player2):
+            return True, self.player2
+
+        second_row = self.board[3:6]
+        if np.all(second_row == self.player1):
+            return True, self.player1
+        if np.all(second_row  == self.player2):
+            return True, self.player2
+
+        third_row = self.board[6:9]
+        if np.all(third_row == self.player1):
+            return True, self.player1
+        if np.all(third_row == self.player2):
+            return True, self.player2
+
+        # column
+        first_column = self.board[[0, 3, 6]]
+        if np.all(first_column == self.player1):
+            return True, self.player1
+        if np.all(first_column == self.player2):
+            return True, self.player2
+
+        second_column = self.board[[1, 4, 7]]
+        if np.all(second_column == self.player1):
+            return True, self.player1
+        if np.all(second_column == self.player2):
+            return True, self.player2
+
+        third_column = self.board[[2, 5, 7]]
+        if np.all(third_column == self.player1):
+            return True, self.player1
+        if np.all(third_column == self.player2):
+            return True, self.player2
+
+        # diagonals
+        diag1 = self.board[[0, 4, 8]]
+        if np.all(diag1 == self.player1):
+            return True, self.player1
+        if np.all(diag1 == self.player2):
+            return True, self.player2
+
+        diag2 = self.board[[6, 4, 2]]
+        if np.all(diag2 == self.player1):
+            return True, self.player1
+        if np.all(diag2 == self.player2):
+            return True, self.player2
+
+        return False, None
+
+
+    def get_reward(self, who_won):
+        if who_won == None:
+            return self.draw_reward
+        elif who_won == self.player1:
+            return self.win_reward
+        elif who_won == self.player2:
+            return self.loss_reward
+        else:
+            raise ValueError("get_reward failed unexpectedly")
+
+    def step(self, action):
+
+        info = {}
+        self.t += 1
+
+        reward = -self.time_step_punishment
+
+        if self.board[action] == 0:
+            self.board[action] = self.player1
+        else:
+            raise ValueError(f"selected invalid {action=}, in {self.board=}")
+
+        terminal, who_won = self.check_terminal()
+
+        if terminal:
+            reward += self.get_reward(who_won)
+            return self.board, reward, terminal, info
+
+        # PLAYER DID NOT WIN, PLAY OUT ENVIRONMENT ACTION
+        self.t += 1
+        
+        action_opponent = self.get_random_action()
+        if self.board[action_opponent] == 0:
+            self.board[action_opponent] = self.player2
+        else:
+            raise ValueError("invalid opponent move")
+
+        terminal, who_won = self.check_terminal()
+
+        if terminal:
+            reward += self.get_reward(who_won)
+
+        return self.board, reward, terminal, info
 
         
-    def calc_size_observation_space(self):
 
-        pass
+
+    def get_random_action(self):
+        return np.random.choice(np.where(self.board == 0)[0])
 
 
 class Easy21:
@@ -327,10 +479,12 @@ class Easy21:
 
 if __name__ == '__main__':
 
+    env = TicTacToe()
+
     # env = WindyGridWorld('grid1', moves='standard')
 
-    env = Easy21()
+    #env = Easy21()
     
-    s = env.reset()
+    #s = env.reset()
 
-    s = env.step
+    #s = env.step
