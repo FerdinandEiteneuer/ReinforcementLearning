@@ -11,19 +11,23 @@ if __name__ == '__main__':
 
     env = KaggleTicTacToe()
 
+    starting_position = np.zeros((1, 9))
 
-    size_memory = 256, env.action_space.n + 1
+    size_memory = 1024, env.action_space.n + 1
 
     agent = DeepQLearningAgent(
         env=env,
         gamma=1,
         size_Q_memory=size_memory,
-        epsilon_scheduler=const_scheduler(0.1),
+        epsilon_scheduler=const_scheduler(0.15),
         experience_replay=True,
         fixed_target_weights=False
     )
 
+    print('starting position:', agent.Q(starting_position).numpy())
+
     agent.train(5000)
 
-    total_reward = agent.play(5000, policy='random')
-    print(f'{total_reward=}')
+    print('starting position after train:', agent.Q(starting_position).numpy())
+
+    total_reward = agent.play(1000, policy='random')

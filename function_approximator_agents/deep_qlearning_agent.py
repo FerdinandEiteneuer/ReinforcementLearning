@@ -33,7 +33,7 @@ class DeepQLearningAgent(NeuralNetworkAgent):
             )
 
         optimizer = tf.keras.optimizers.Adam(
-            learning_rate=0.004,
+            learning_rate=0.001,
             beta_1=0.9,
             beta_2=0.999,
             epsilon=1e-07,
@@ -92,11 +92,11 @@ class DeepQLearningAgent(NeuralNetworkAgent):
             states = self.Q_memory[:, :-1]
             rewards = self.Q_memory[:, -1]
 
-            fit_result =self.Q.fit(x=states, y=rewards, batch_size=128, epochs=8, verbose=False)
+            fit_result =self.Q.fit(x=states, y=rewards, batch_size=128, epochs=4, verbose=False)
             return fit_result
             # self.Q.train_on_batch(states, rewards)
         else:
-            return None # dont train here
+            return False # dont train here
 
     def train_one_episode(self):
 
@@ -105,6 +105,8 @@ class DeepQLearningAgent(NeuralNetworkAgent):
         terminal = False
 
         state = self.env.reset()
+
+        losses = []
 
         while not terminal:
 
@@ -122,10 +124,20 @@ class DeepQLearningAgent(NeuralNetworkAgent):
             if self.experience_replay:
                 self.Q_memory[self.episodes % self.size_Q_memory] = list(state) + [target]  # add to memory
 
-            train_info = self.update_Q()
+            fit_info = self.update_Q()
+
+            if fit_info:
+
+                history = fit_info.history
+                losses.extend(history['loss'])
+
             state = next_state
 
-        return reward
+        mean_loss = np.mean(losses)
+
+        train_info = {'mean_loss': mean_loss, 'last_reward': reward}
+
+        return train_info
 
     def play_one_episode(self):
         """
@@ -155,6 +167,8 @@ class DeepQLearningAgent(NeuralNetworkAgent):
         Main training or evaluation loop.
         """
         ema_reward = 0
+        ema_mean_loss = 0
+
         beta = 0.995
         total_reward = 0
 
@@ -163,15 +177,25 @@ class DeepQLearningAgent(NeuralNetworkAgent):
             for k in range(n_episodes):
 
                 if train:
-                    reward = self.train_one_episode()
+                    info = self.train_one_episode()
                 else:
-                    reward, episode_memory = self.play_one_episode()
+                    info = self.play_one_episode()
 
-                total_reward += reward
+
                 postfix = ''
+
+                reward = info['last_reward']
+                total_reward += reward
 
                 ema_reward = beta * ema_reward + (1 - beta) * reward
                 postfix += f'avg reward:{ema_reward:.2f}, '
+
+
+                if 'mean_loss' in info:
+                    mean_loss = info['mean_loss']
+                    ema_mean_loss = beta * ema_mean_loss + (1 - beta) * mean_loss
+                    if k > 200:
+                        postfix += f'mean loss={ema_mean_loss:.2f}, '
 
                 if self.eps != None:
                     postfix += f'eps={self.eps:.2e}'
@@ -179,6 +203,7 @@ class DeepQLearningAgent(NeuralNetworkAgent):
                 t.postfix = postfix
                 t.update()
 
+        print(f'did {n_episodes=}, {total_reward=}')
         return total_reward
 
     def train(self, n_episodes, policy='eps_greedy'):
