@@ -2,7 +2,7 @@ from environments import KaggleTicTacToe
 import numpy as np
 from function_approximator_agents.deep_qlearning_agent import DeepQLearningAgent
 
-
+print('\n------------\n')
 const_scheduler = lambda eps: lambda episodes: eps
 decay_scheduler1 = lambda episodes: 1/episodes
 
@@ -24,10 +24,13 @@ if __name__ == '__main__':
         fixed_target_weights=False
     )
 
-    print('starting position:', agent.Q(starting_position).numpy())
+    #total_reward = agent.play(10000, policy='random')
 
-    agent.train(5000)
+    print('starting position:\n', agent.Q(starting_position).numpy().reshape((3,3)))
+
+    agent.train(15000)
 
     print('starting position after train:', agent.Q(starting_position).numpy())
 
-    total_reward = agent.play(1000, policy='random')
+    print(f'TESTING AGENT\n')
+    total_reward = agent.play(10000, policy='random')

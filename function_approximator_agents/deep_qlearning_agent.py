@@ -33,7 +33,7 @@ class DeepQLearningAgent(NeuralNetworkAgent):
             )
 
         optimizer = tf.keras.optimizers.Adam(
-            learning_rate=0.001,
+            learning_rate=0.0005,
             beta_1=0.9,
             beta_2=0.999,
             epsilon=1e-07,
@@ -85,14 +85,18 @@ class DeepQLearningAgent(NeuralNetworkAgent):
             return None, None, False
 
 
+    def get_training_data(self):
+        states = self.Q_memory[:, :-1]
+        rewards = self.Q_memory[:, -1]
+        return states, rewards
 
-    def update_Q_yes_replay_no_fixed(self):
+    def update_Q_yes_replay_no_fixed(self, episodes=4):
 
         if self.episodes > self.size_Q_memory:
-            states = self.Q_memory[:, :-1]
-            rewards = self.Q_memory[:, -1]
 
-            fit_result =self.Q.fit(x=states, y=rewards, batch_size=128, epochs=4, verbose=False)
+            states, rewards = self.training_data()
+
+            fit_result =self.Q.fit(x=states, y=rewards, batch_size=128, epochs=episodes, verbose=False)
             return fit_result
             # self.Q.train_on_batch(states, rewards)
         else:
@@ -107,6 +111,7 @@ class DeepQLearningAgent(NeuralNetworkAgent):
         state = self.env.reset()
 
         losses = []
+        fit_info = None
 
         while not terminal:
 
@@ -124,17 +129,18 @@ class DeepQLearningAgent(NeuralNetworkAgent):
             if self.experience_replay:
                 self.Q_memory[self.episodes % self.size_Q_memory] = list(state) + [target]  # add to memory
 
-            fit_info = self.update_Q()
+            if self.episodes % 50 == 0:
+                fit_info = self.update_Q(episodes=20)
 
             if fit_info:
-
                 history = fit_info.history
                 losses.extend(history['loss'])
+                fit_info = None
 
             state = next_state
 
-        mean_loss = np.mean(losses)
 
+        mean_loss = np.mean(losses) if len(losses) > 0 else None
         train_info = {'mean_loss': mean_loss, 'last_reward': reward}
 
         return train_info
@@ -160,16 +166,20 @@ class DeepQLearningAgent(NeuralNetworkAgent):
 
             state = next_state
 
-        return reward, episode_memory
+        info['last_reward'] = reward
+        info['episode_memory'] = episode_memory
+        return info
 
     def _loop(self, n_episodes, train=True):
         """
         Main training or evaluation loop.
         """
         ema_reward = 0
-        ema_mean_loss = 0
 
-        beta = 0.995
+        ema_mean_loss = 0
+        beta_mean_loss = 0.9
+
+        beta = 0.99
         total_reward = 0
 
         with tqdm(total=n_episodes, postfix='T=') as t:
@@ -191,11 +201,10 @@ class DeepQLearningAgent(NeuralNetworkAgent):
                 postfix += f'avg reward:{ema_reward:.2f}, '
 
 
-                if 'mean_loss' in info:
+                if 'mean_loss' in info and info['mean_loss']:
                     mean_loss = info['mean_loss']
-                    ema_mean_loss = beta * ema_mean_loss + (1 - beta) * mean_loss
-                    if k > 200:
-                        postfix += f'mean loss={ema_mean_loss:.2f}, '
+                    ema_mean_loss = beta_mean_loss * ema_mean_loss + (1 - beta_mean_loss) * mean_loss
+                postfix += f'mean loss={ema_mean_loss:.2f}, '
 
                 if self.eps != None:
                     postfix += f'eps={self.eps:.2e}'
@@ -203,7 +212,7 @@ class DeepQLearningAgent(NeuralNetworkAgent):
                 t.postfix = postfix
                 t.update()
 
-        print(f'did {n_episodes=}, {total_reward=}')
+        print(f'did {n_episodes=}, {total_reward=}, win %: {total_reward/n_episodes*100}')
         return total_reward
 
     def train(self, n_episodes, policy='eps_greedy'):

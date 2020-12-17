@@ -9,7 +9,10 @@ with contextlib.redirect_stdout(None):
 
 
 class KaggleTicTacToe():
-
+    """
+    Wrapper around the environment 'tictactoe' to make it open ai gym compliant.
+    This means, reset(), step() return the appropriate values.
+    """
     def __init__(self):
 
         self.env = make("tictactoe", debug=True)
@@ -26,7 +29,9 @@ class KaggleTicTacToe():
         self.observation_size = gym.spaces.discrete.Discrete(9)
 
     def __str__(self):
-
+        """
+        Pretty print the tic tac toe board.
+        """
         board_human_readable = []
         for s in self.state:
             if s == 1:
