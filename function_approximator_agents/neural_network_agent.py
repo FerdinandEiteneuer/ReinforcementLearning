@@ -9,30 +9,39 @@ class NeuralNetworkAgent:
         self.Q = None
         self.env = env
         self.epsilon_scheduler = epsilon_scheduler
+        self.eps = None
         self.gamma = gamma
 
-        # Set policy
+        self.default_policy = policy
+        self.set_policy(policy)
+
+    def set_policy(self, policy='eps_greedy'):
         if policy == 'eps_greedy':
             self.policy = self.get_epsilon_greedy_action
         elif policy == 'random':
             self.policy = self.get_random_action
         elif policy == 'greedy':
             self.policy = self.get_greedy_action
+        else:
+            raise ValueError(f'Policy was {policy}, but must be "eps_greedy", "greedy" or "random".')
 
-
-    def get_random_action(self, state=None):
+    def get_random_action(self, *args):
         """
         Samples a random action from the environment.
         """
         return self.env.action_space.sample()
 
-    def get_epsilon_greedy_action(self, state):
+    def get_epsilon_greedy_action(self, state, eps=None):
         """
         Picks the epsilon greedy action. With probability episolon,
         a random action is chosen. Otherwise, the greedy actions gets chosen.
         """
 
-        self.eps = self.epsilon_scheduler(self.episodes)
+        if eps is None:
+            self.eps = self.epsilon_scheduler(self.episodes)
+        else:
+            assert 0 <= eps <= 1
+            self.eps = eps
 
         explore = self.eps > np.random.random()
 
@@ -43,7 +52,11 @@ class NeuralNetworkAgent:
 
     def analyse_maxQ(self, state):
 
-        q = self.Q.predict(state.reshape(1, 9))[0]
+        shape = 1, self.env.action_space.n
+
+        q = self.Q(state.reshape(shape)).numpy()[0]  # use faster __call__ instead of predict
+        #q = self.Q.predict(state.reshape(shape))[0]
+
         index_max = 0
         q_max = - np.inf
         for i, s in enumerate(state):

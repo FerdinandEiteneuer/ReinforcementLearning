@@ -26,10 +26,14 @@ class DeepQLearningAgent(NeuralNetworkAgent):
         if Q is not None:
             self.Q = Q
         else:
-            self.Q = function_approximator_agents.utils.create_Dense_net1()
+            self.Q = function_approximator_agents.utils.create_Dense_net1(
+                layers=1,
+                neurons=256,
+                p_dropout=0.3,
+            )
 
         optimizer = tf.keras.optimizers.Adam(
-            learning_rate=0.001,
+            learning_rate=0.004,
             beta_1=0.9,
             beta_2=0.999,
             epsilon=1e-07,
@@ -88,9 +92,7 @@ class DeepQLearningAgent(NeuralNetworkAgent):
             states = self.Q_memory[:, :-1]
             rewards = self.Q_memory[:, -1]
 
-            fit_result =self.Q.fit(x=states, y=rewards, batch_size=32, epochs=32)
-            print('FIT RESULT', fit_result)
-            sys.exit()
+            fit_result =self.Q.fit(x=states, y=rewards, batch_size=128, epochs=8, verbose=False)
             return fit_result
             # self.Q.train_on_batch(states, rewards)
         else:
@@ -107,6 +109,9 @@ class DeepQLearningAgent(NeuralNetworkAgent):
         while not terminal:
 
             action = self.policy(state)
+            #action = self.get_random_action()
+            #print(f'{self.episodes=}, {action=}, {self.env.board}')
+
             next_state, reward, terminal, info = self.env.step(action)
 
             if terminal:
@@ -122,51 +127,71 @@ class DeepQLearningAgent(NeuralNetworkAgent):
 
         return reward
 
+    def play_one_episode(self):
+        """
+        The agent plays one episode.
+        """
 
-    def get_random_action(self):
-        valid_actions = np.where(self.env.board == 0)[0]
-        #print(valid_actions)#, np.random.choice(valid_actions))
-        return np.random.choice(valid_actions)
+        # setup
+        terminal = False
+        reward = None
+        state = self.env.reset()
+        episode_memory = []
 
-    def train(self, n_episodes):
+        while not terminal:
 
+            action = self.policy(state)
+
+            #episode_memory.append((state, action, reward, terminal))
+
+            next_state, reward, terminal, info = self.env.step(action)
+
+            state = next_state
+
+        return reward, episode_memory
+
+    def _loop(self, n_episodes, train=True):
+        """
+        Main training or evaluation loop.
+        """
         ema_reward = 0
         beta = 0.995
+        total_reward = 0
 
         with tqdm(total=n_episodes, postfix='T=') as t:
 
             for k in range(n_episodes):
-                print(k)
-                self.train_one_episode()
 
+                if train:
+                    reward = self.train_one_episode()
+                else:
+                    reward, episode_memory = self.play_one_episode()
+
+                total_reward += reward
                 postfix = ''
-                """
-                T = self.episode_info['T']
-                    ema_T = beta * ema_T + (1 - beta) * T
-                    postfix += f'T={ema_T:.2f}, '
-                else:
-                    postfix += 'T=n/a, '
 
-                if self.episode_info['total reward'] != None:
-                    reward = self.episode_info['total reward']
-                    ema_avg_reward = beta * ema_avg_reward + (1 - beta) * reward
-                    postfix += f'avg_ret={ema_avg_reward:.2f}, '
-                else:
-                    postfix += f'avg_ret=n/a, '
+                ema_reward = beta * ema_reward + (1 - beta) * reward
+                postfix += f'avg reward:{ema_reward:.2f}, '
 
                 if self.eps != None:
-                    postfix += f'eps={self.eps:.2e}, '
-
-                if self.episode_info['wins'] != None:
-                    wins = self.episode_info['wins']
-                    postfix += f'total wins={wins}'
-                else:
-                    postfix += f'total wins n/a'
+                    postfix += f'eps={self.eps:.2e}'
 
                 t.postfix = postfix
                 t.update()
-                """
 
+        return total_reward
+
+    def train(self, n_episodes, policy='eps_greedy'):
+        """
+        Train the agent n_episodes
+        """
+        self.set_policy(policy)
+        return self._loop(n_episodes, train=True)
+
+    def play(self, n_episodes, policy='greedy'):
+
+        self.set_policy(policy)
+        return self._loop(n_episodes, train=False)
 
 
 if __name__ == '__main__':
