@@ -50,12 +50,29 @@ class NeuralNetworkAgent:
         else:
             return self.get_greedy_action(state)
 
+    def predict(self, state):
+
+        n_actions = self.env.action_space.n
+
+        shape = (n_actions, self.Q_memory.shape[1] - 1)
+
+        values = np.zeros(shape)
+
+        values[:, :-1] = state
+        values[:, -1] = range(n_actions)
+
+        # if state is [12,52,21] and we have actions 0, 1, 2
+        # values = [[12, 52, 21, 0],
+        #           [12, 52, 21, 1],
+        #           [12, 52, 21, 2]]
+
+        qs = self.Q(values).numpy()  # use __call__ instead of predict, as its faster for smaller batch sizes
+        return qs
+
+
     def analyse_maxQ(self, state):
 
-        shape = 1, self.env.action_space.n
-
-        q = self.Q(state.reshape(shape)).numpy()[0]  # use faster __call__ instead of predict
-        #q = self.Q.predict(state.reshape(shape))[0]
+        q = self.predict(state)
 
         index_max = 0
         q_max = - np.inf

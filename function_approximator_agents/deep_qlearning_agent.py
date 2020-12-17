@@ -4,9 +4,9 @@ import tensorflow as tf
 from tqdm import tqdm
 import sys
 
-
 from function_approximator_agents.neural_network_agent import NeuralNetworkAgent
 import function_approximator_agents.utils
+
 
 class DeepQLearningAgent(NeuralNetworkAgent):
 
@@ -26,7 +26,10 @@ class DeepQLearningAgent(NeuralNetworkAgent):
         if Q is not None:
             self.Q = Q
         else:
+            input_shape = (env.observation_space.n + 1,)
             self.Q = function_approximator_agents.utils.create_Dense_net1(
+                input_shape=input_shape,
+                n_outputs=1,
                 layers=1,
                 neurons=256,
                 p_dropout=0.3,
@@ -44,7 +47,6 @@ class DeepQLearningAgent(NeuralNetworkAgent):
             optimizer=optimizer,
             loss='mean_squared_error',
         )
-
 
         self.episodes = 0
 
@@ -69,7 +71,9 @@ class DeepQLearningAgent(NeuralNetworkAgent):
         self.fixed_target_weights = fixed_target_weights
 
     def get_batch(self):
-
+        """
+        deprecated
+        """
         memory = self.Q_memory[:self.episodes]
         batch_size = max(1, min(self.batch_size, self.e))
 
@@ -84,26 +88,29 @@ class DeepQLearningAgent(NeuralNetworkAgent):
 
             return None, None, False
 
-
-    def get_training_data(self):
-        states = self.Q_memory[:, :-1]
+    def training_data(self):
+        state_action_inputs = self.Q_memory[:, :-1]
         rewards = self.Q_memory[:, -1]
-        return states, rewards
+        return state_action_inputs, rewards
 
     def update_Q_yes_replay_no_fixed(self, episodes=4):
-
         if self.episodes > self.size_Q_memory:
 
-            states, rewards = self.training_data()
+            state_action_inputs, rewards = self.training_data()
 
-            fit_result =self.Q.fit(x=states, y=rewards, batch_size=128, epochs=episodes, verbose=False)
+            fit_result = self.Q.fit(
+                x=state_action_inputs,
+                y=rewards,
+                batch_size=128,
+                epochs=episodes,
+                verbose=False)
+
             return fit_result
             # self.Q.train_on_batch(states, rewards)
         else:
-            return False # dont train here
+            return False  # dont train here
 
     def train_one_episode(self):
-
         # initialize
         self.episodes += 1
         terminal = False
@@ -116,8 +123,8 @@ class DeepQLearningAgent(NeuralNetworkAgent):
         while not terminal:
 
             action = self.policy(state)
-            #action = self.get_random_action()
-            #print(f'{self.episodes=}, {action=}, {self.env.board}')
+            # action = self.get_random_action()
+            # print(f'{self.episodes=}, {action=}, {self.env.board}')
 
             next_state, reward, terminal, info = self.env.step(action)
 
@@ -127,7 +134,7 @@ class DeepQLearningAgent(NeuralNetworkAgent):
                 target = reward + self.gamma * self.get_maxQ(next_state)
 
             if self.experience_replay:
-                self.Q_memory[self.episodes % self.size_Q_memory] = list(state) + [target]  # add to memory
+                self.Q_memory[self.episodes % self.size_Q_memory] = list(state) + [action, target]  # add to memory
 
             if self.episodes % 50 == 0:
                 fit_info = self.update_Q(episodes=20)
@@ -139,11 +146,11 @@ class DeepQLearningAgent(NeuralNetworkAgent):
 
             state = next_state
 
-
         mean_loss = np.mean(losses) if len(losses) > 0 else None
         train_info = {'mean_loss': mean_loss, 'last_reward': reward}
 
         return train_info
+
 
     def play_one_episode(self):
         """
@@ -157,10 +164,9 @@ class DeepQLearningAgent(NeuralNetworkAgent):
         episode_memory = []
 
         while not terminal:
-
             action = self.policy(state)
 
-            #episode_memory.append((state, action, reward, terminal))
+            # episode_memory.append((state, action, reward, terminal))
 
             next_state, reward, terminal, info = self.env.step(action)
 
@@ -169,6 +175,7 @@ class DeepQLearningAgent(NeuralNetworkAgent):
         info['last_reward'] = reward
         info['episode_memory'] = episode_memory
         return info
+
 
     def _loop(self, n_episodes, train=True):
         """
@@ -191,7 +198,6 @@ class DeepQLearningAgent(NeuralNetworkAgent):
                 else:
                     info = self.play_one_episode()
 
-
                 postfix = ''
 
                 reward = info['last_reward']
@@ -199,7 +205,6 @@ class DeepQLearningAgent(NeuralNetworkAgent):
 
                 ema_reward = beta * ema_reward + (1 - beta) * reward
                 postfix += f'avg reward:{ema_reward:.2f}, '
-
 
                 if 'mean_loss' in info and info['mean_loss']:
                     mean_loss = info['mean_loss']
@@ -212,8 +217,12 @@ class DeepQLearningAgent(NeuralNetworkAgent):
                 t.postfix = postfix
                 t.update()
 
-        print(f'did {n_episodes=}, {total_reward=}, win %: {total_reward/n_episodes*100}')
+                if k % 500 == 0:
+                    print(self.predict(9*[0]).reshape((3,3)), f'{k=}')
+
+        print(f'did {n_episodes=}, {total_reward=}, win %: {total_reward / n_episodes * 100}')
         return total_reward
+
 
     def train(self, n_episodes, policy='eps_greedy'):
         """
@@ -222,12 +231,12 @@ class DeepQLearningAgent(NeuralNetworkAgent):
         self.set_policy(policy)
         return self._loop(n_episodes, train=True)
 
-    def play(self, n_episodes, policy='greedy'):
 
+    def play(self, n_episodes, policy='greedy'):
         self.set_policy(policy)
         return self._loop(n_episodes, train=False)
 
 
 if __name__ == '__main__':
-    print('MAIN')
+    print('\n\n')
     agent = DeepQLearningAgent(env=None)

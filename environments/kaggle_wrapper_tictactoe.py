@@ -26,7 +26,7 @@ class KaggleTicTacToe():
         self.action_space = gym.spaces.discrete.Discrete(9)
         self.action_space.sample = self.get_random_action
 
-        self.observation_size = gym.spaces.discrete.Discrete(9)
+        self.observation_space = gym.spaces.discrete.Discrete(9)
 
     def __str__(self):
         """
