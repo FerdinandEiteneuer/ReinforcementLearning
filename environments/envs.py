@@ -191,19 +191,28 @@ class WindyGridWorld:
 
 class TicTacToe:
 
-    def __init__(self, player1=1, player2=2):
+    def __init__(self,
+                 player1=1,
+                 player2=2,
+                 win_reward=1,
+                 draw_reward=0.5,
+                 loss_reward=0,
+                 time_step_punishment=0):
 
         self.action_space = gym.spaces.discrete.Discrete(9)
         self.observation_size = gym.spaces.discrete.Discrete(9)
 
+        # value that the board takes on when a player selects the corresponding place
         self.player1 = player1
         self.player2 = player2
 
-        self.win_reward = 1
-        self.draw_reward = 0.5
-        self.loss_reward = 0
+        # rewards
+        self.win_reward = win_reward
+        self.draw_reward = draw_reward
+        self.loss_reward = loss_reward
 
-        self.time_step_punishment = 0
+        # incentize agent to win quickly
+        self.time_step_punishment = time_step_punishment
 
         self.reset()
 
@@ -242,12 +251,15 @@ class TicTacToe:
          [3,4,5],
          [6,7,8]]
         """
-        return False, None
         if self.t < 5:
             return False, None
         if self.t == 9:
             return True, None
 
+        if np.random.uniform() < 0.4:
+            return True, self.player1
+        else:
+            return False, None
         # horizontal
         first_row = self.board[0:3]
         if np.all(first_row == self.player1):
@@ -346,12 +358,16 @@ class TicTacToe:
 
         return self.board, reward, terminal, info
 
-        
-
 
     def get_random_action(self):
-        return np.random.choice(np.where(self.board == 0)[0])
-
+        try:
+            return np.random.choice(np.where(self.board == 0)[0])
+        except ValueError as e:
+            choices = np.where(self.board == 0)[0]
+            if len(choices) == 0:
+                raise ValueError('board is full, cant take an action')
+            else:
+                raise e
 
 class Easy21:
     
