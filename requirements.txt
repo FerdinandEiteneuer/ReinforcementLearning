@@ -1,4 +1,10 @@
+# rl
 gym
+
+# computation
 tensorflow
-requests
 numpy
+
+# other
+requests
+tqdm
