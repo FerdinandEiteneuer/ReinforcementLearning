@@ -6,16 +6,20 @@ class NeuralNetworkAgent:
 
     def __init__(self, env, epsilon_scheduler, policy, gamma):
 
-        self.Q = None
         self.env = env
         self.epsilon_scheduler = epsilon_scheduler
         self.eps = None
         self.gamma = gamma
 
         self.default_policy = policy
+
+        # neural network
+        self.Q = None
+        self._prediction_network = 'Q'
+
         self.set_policy(policy)
 
-    def set_policy(self, policy='eps_greedy'):
+    def set_policy(self, policy):
         if policy == 'eps_greedy':
             self.policy = self.get_epsilon_greedy_action
         elif policy == 'random':
@@ -29,7 +33,10 @@ class NeuralNetworkAgent:
         """
         Samples a random action from the environment.
         """
-        return self.env.action_space.sample()
+        #print('nnetagent chooses random action')
+        action = self.env.action_space.sample()
+        #print('nnetagent done chosing sampling random action', action)
+        return action
 
     def get_epsilon_greedy_action(self, state, eps=None):
         """
@@ -53,22 +60,29 @@ class NeuralNetworkAgent:
     def predict(self, state):
 
         n_actions = self.env.action_space.n
+        size_obs_space = self.env.observation_space.n
+        shape = (n_actions, n_actions + size_obs_space)
 
-        shape = (n_actions, self.Q_memory.shape[1] - 1)
+        actions_one_hot = np.eye(n_actions)
 
         values = np.zeros(shape)
-
-        values[:, :-1] = state
-        values[:, -1] = range(n_actions)
-
+        values[:, :size_obs_space] = state
+        values[:, size_obs_space:] = actions_one_hot
         # if state is [12,52,21] and we have actions 0, 1, 2
-        # values = [[12, 52, 21, 0],
-        #           [12, 52, 21, 1],
-        #           [12, 52, 21, 2]]
+        # values = [[12, 52, 21, 1, 0, 0],
+        #           [12, 52, 21, 0, 1, 0],
+        #           [12, 52, 21, 0, 0, 1]]
 
-        qs = self.Q(values).numpy()  # use __call__ instead of predict, as its faster for smaller batch sizes
+        if self._prediction_network == 'Q':
+            model = self.Q
+        elif self._prediction_network == 'Q_fixed_weights':
+            model = self.Q_fixed_weights
+        else:
+            raise ValueError(f'could not find prediction network')
+
+        qs = model(values).numpy()  # use __call__ instead of predict, as its faster for smaller batch sizes
+
         return qs
-
 
     def analyse_maxQ(self, state):
 
@@ -77,7 +91,7 @@ class NeuralNetworkAgent:
         index_max = 0
         q_max = - np.inf
         for i, s in enumerate(state):
-            if s != 0:  # WARNING this means only s != is still valid move. WARNING
+            if s != 0:  # WARNING this means only s != 0 is still valid move. WARNING
                 continue  # only select legal actions
             if q[i] > q_max:
                 q_max = q[i]
@@ -90,6 +104,7 @@ class NeuralNetworkAgent:
         Picks the greedy action, given a state.
         """
         _, index_max = self.analyse_maxQ(state)
+        #print('player choosing to get greedy action', state, index_max)
         return index_max
 
     def get_maxQ(self, state):
