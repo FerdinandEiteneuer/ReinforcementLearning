@@ -11,21 +11,31 @@ print('\n------------\n')
 const_scheduler = lambda eps: lambda episodes: eps
 decay_scheduler1 = lambda episodes: 1/episodes
 
-def predict_starting_position(agent):
-    print(agent.predict(9*[0]).reshape((3,3)))
 
-def pred(model):
-    vals = np.zeros((9, 18))
-    vals[:,-1] = np.eye(9)
-    print('using', vals)
-    print(model(vals).numpy().reshape((3,3)))
+def predict_starting_position(agent, mode='connectx'):
+    if mode == 'tictactoe':
+        print(agent.predict(9*[0]).reshape((3, 3)))
+    elif mode == 'connectx':
+        print(agent.predict(9*[0]).reshape(agent.env.action_space.n))
+
+
+def pred(model, mode='connectx'):
+    if mode == 'tictactoe':
+        vals = np.zeros((9, 18))
+        vals[:, -1] = np.eye(9)
+        print('using', vals)
+        print(model(vals).numpy().reshape((3, 3)))
+    elif mode == 'connectx':
+        vals = np.zeros((3, 12))
+        vals[:, -3:] = np.eye(3)
+        print('using', vals)
+        print(model(vals).numpy())
 
 
 if __name__ == '__main__':
-    """
-    Train the agent on tictactoe.
-    """
-    env = KaggleTicTacToe()
+
+    #env = KaggleTicTacToe()
+    env = KaggleConnectX(rows=3, columns=3, inarow=3)
 
     starting_position = np.zeros((1, 9))
 
@@ -39,30 +49,22 @@ if __name__ == '__main__':
         experience_replay=True,
         size_Q_memory=size_memory,
         fixed_target_weights=True,
-        update_period_fixed_target_weights=500,
+        update_period_fixed_target_weights=1000,
     )
 
-    """
-    pred(agent.Q)
-
-    model2 = tf.keras.models.clone_model(agent.Q)
-    model2.set_weights(agent.Q.get_weights())
-    model2.compile()
-
-    pred(model2)
-
-    sys.exit()
-
-    #total_reward = agent.play(1000, policy='random') # random play: about ~29% winrate
-
-    """
-
-    for i in range(10):
-        agent.train(3000, policy='eps_greedy')
-        agent.play(1000, policy='greedy')
-
-    print('starting position after train')
     predict_starting_position(agent)
 
+
+    #total_reward = agent.play(10000, policy='random') # random play: about ~29% winrate
+
+
+    for i in range(5):
+        print('\n\nNEW TRAING / PLAY LOOP', i)
+        agent.train(8000, policy='eps_greedy')
+        agent.play(1000, policy='greedy')
+
+        print('starting position after train')
+        predict_starting_position(agent)
+
     print(f'TESTING AGENT\n')
-    total_reward = agent.play(10000, policy='random')
+    total_reward = agent.play(5000, policy='greedy')

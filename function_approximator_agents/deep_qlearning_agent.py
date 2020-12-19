@@ -33,12 +33,12 @@ class DeepQLearningAgent(NeuralNetworkAgent):
                 input_shape=input_shape,
                 n_outputs=1,
                 layers=1,
-                neurons=256,
-                p_dropout=0.2,
+                neurons=512,
+                p_dropout=0.5,
             )
 
         optimizer = tf.keras.optimizers.Adam(
-            learning_rate=0.0005,
+            learning_rate=0.005,
             beta_1=0.8,
             beta_2=0.999,
             epsilon=1e-07,
@@ -255,8 +255,8 @@ class DeepQLearningAgent(NeuralNetworkAgent):
                 t.postfix = postfix
                 t.update()
 
-                if k % 500 == 0:
-                    print(self.predict(9*[0]).reshape((3,3)), f'{k=}')
+                #if k % 500 == 0:
+                #    print(self.predict(9*[0]).reshape((3,3)), f'{k=}')
 
         print(f'did {n_episodes=}, {total_reward=}, win %: {total_reward / n_episodes * 100}')
         return total_reward

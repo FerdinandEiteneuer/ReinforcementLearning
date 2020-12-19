@@ -73,6 +73,8 @@ class NeuralNetworkAgent:
         #           [12, 52, 21, 0, 1, 0],
         #           [12, 52, 21, 0, 0, 1]]
 
+        #print('\nIN PREDICT..INPUT IS', state, '\n', values)
+
         if self._prediction_network == 'Q':
             model = self.Q
         elif self._prediction_network == 'Q_fixed_weights':
@@ -81,11 +83,25 @@ class NeuralNetworkAgent:
             raise ValueError(f'could not find prediction network')
 
         qs = model(values).numpy()  # use __call__ instead of predict, as its faster for smaller batch sizes
-
+        #print(qs)
         return qs
 
     def analyse_maxQ(self, state):
 
+        #connectx
+        qs = self.predict(state)
+
+        index_max = 0
+        q_max = - np.inf
+        for i, q in enumerate(qs):
+            if self.env.state[i] != 0:  # WARNING this means only s != 0 is still valid move. WARNING
+                continue  # only select legal actions
+            if q > q_max:
+                q_max = q
+                index_max = i
+
+        """
+        #tictactoe
         q = self.predict(state)
 
         index_max = 0
@@ -96,7 +112,7 @@ class NeuralNetworkAgent:
             if q[i] > q_max:
                 q_max = q[i]
                 index_max = i
-
+        """
         return q_max, index_max
 
     def get_greedy_action(self, state):

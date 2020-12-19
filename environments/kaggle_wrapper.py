@@ -20,7 +20,7 @@ class KaggleEnvWrapper():
         pass
 
     def __str__(self):
-        return env.render(mode='ansi')
+        return self.env.render(mode='ansi')
 
     def get_random_action(self):
         raise NotImplementedError('The derived class must implement this.a')
@@ -84,17 +84,17 @@ class KaggleEnvWrapper():
 
 class KaggleConnectX(KaggleEnvWrapper):
 
-    def __init__(self, rows=6, columns=7):
+    def __init__(self, rows=6, columns=7, inarow=4):
 
         super().__init__()
 
-        config = {'rows': rows, 'columns': columns}
+        config = {'rows': rows, 'columns': columns, 'inarow': inarow}
 
         self.env = make("connectx",
                         configuration=config,
                         debug=True)
 
-        self.state = np.zeros((rows, columns))
+        self.state = np.zeros(rows * columns)
 
         # make environment more gym compliant
         self.action_space = Discrete(columns)
@@ -108,13 +108,16 @@ class KaggleConnectX(KaggleEnvWrapper):
         """
         Returns a randomly sampled action.
         """
-        indices_first_row = [self.rows * i  for i in range(self.columns)]
-        first_row = state[indices_first_row]
-        return np.random.choice(np.where(first_row == 0)[0])
+        first_row = self.state[:self.columns]
+        return int(np.random.choice(np.where(first_row == 0)[0]))
 
 
 class KaggleTicTacToe(KaggleEnvWrapper):
+    """
+    This class is a wrapper class around kaggles TicTacToe environment.
 
+    The average winrate for a random player vs a random opponent is about 30%.
+    """
     def __init__(self):
 
         self.env = make("tictactoe", debug=True)
@@ -143,5 +146,6 @@ if __name__ == '__main__':
         print(env)
         print(f'{reward=}, {terminal=}')
 
-    env = KaggleConnectX()
+
+    env = KaggleConnectX(rows=5, columns=5, inarow=3)
     state = env.reset()
