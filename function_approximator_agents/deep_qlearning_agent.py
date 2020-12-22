@@ -4,6 +4,7 @@ import tensorflow as tf
 from tqdm import tqdm
 import sys
 from collections import deque
+import gym
 
 from function_approximator_agents.neural_network_agent import NeuralNetworkAgent
 import function_approximator_agents.utils
@@ -28,26 +29,35 @@ class DeepQLearningAgent(NeuralNetworkAgent):
         if Q is not None:
             self.Q = Q
         else:
-            input_shape = (env.observation_space.n + env.action_space.n,)
+
+            if type(env.observation_space) is gym.spaces.discrete.Discrete:
+                self.Q_input_shape = (env.observation_space.n + env.action_space.n, )
+            elif type(env.observation_space) is gym.spaces.tuple.Tuple:
+                self.Q_input_shape = (len(env.observation_space) + env.action_space.n, )
+
             self.Q = function_approximator_agents.utils.create_Dense_net1(
-                input_shape=input_shape,
+                input_shape=self.Q_input_shape,
                 n_outputs=1,
                 layers=1,
-                neurons=512,
-                p_dropout=0.5,
+                neurons=1024,
+                p_dropout=0.3,
             )
 
+        self.starting_learning_rate = 0.0001
+
         optimizer = tf.keras.optimizers.Adam(
-            learning_rate=0.005,
-            beta_1=0.8,
+            learning_rate=self.starting_learning_rate,
+            beta_1=0.9,
             beta_2=0.999,
             epsilon=1e-07,
             amsgrad=False
         )
 
+        self.loss = 'mean_squared_error'
+
         self.Q.compile(
             optimizer=optimizer,
-            loss='mean_squared_error',
+            loss=self.loss,
         )
 
         self.episodes = 0
@@ -63,7 +73,6 @@ class DeepQLearningAgent(NeuralNetworkAgent):
             # the attribute 'Q_fixed_weights' shall be reserved for the second network
             self.Q_fixed_weights = tf.keras.models.clone_model(self.Q)
             self.update_period_fixed_target_weights = update_period_fixed_target_weights
-            self._prediction_network = 'Q_fixed_weights'
 
 
         self.experience_replay = experience_replay
@@ -92,29 +101,7 @@ class DeepQLearningAgent(NeuralNetworkAgent):
         rewards = self.Q_memory[:, -1]
         return state_action_inputs, rewards
 
-    def update_Q_yes_replay_no_fixed(self, episodes=4):
-        if self.episodes > self.size_Q_memory:
-
-            state_action_inputs, rewards = self.training_data()
-
-            fit_result = self.Q.fit(
-                x=state_action_inputs,
-                y=rewards,
-                batch_size=128,
-                epochs=episodes,
-                verbose=False)
-
-            return fit_result
-            # self.Q.train_on_batch(states, rewards)
-        else:
-            return False  # dont train here
-
-    def update_Q_yes_replay_yes_fixed(self, episodes=4):
-        if self.episodes > self.size_Q_memory:
-            pass
-
-
-    def update_Q(self, batch_size=128, episodes=4):
+    def update_Q(self, batch_size=128, episodes=1):
         if self.episodes > self.size_Q_memory:
 
             state_action_inputs, rewards = self.training_data()
@@ -136,7 +123,18 @@ class DeepQLearningAgent(NeuralNetworkAgent):
         Updates the fixed weights of the prediction network Q_fixed_targets.
         """
         current_weights = self.Q.get_weights()
+
+        opt = tf.keras.optimizers.Adam(
+            learning_rate=self.starting_learning_rate
+        )  # fresh optimizer, since we will be updating towards new goals
+
+        self.Q_fixed_weights = tf.keras.models.clone_model(self.Q)
         self.Q_fixed_weights.set_weights(current_weights)
+
+        self.Q_fixed_weights.compile(
+            optimizer=opt,
+            loss=self.loss
+        )
 
     def train_one_episode(self):
         # initialize
@@ -153,7 +151,7 @@ class DeepQLearningAgent(NeuralNetworkAgent):
             self.update_fixed_target_weights()
 
         if self.episodes % 20 == 0:
-            fit_info = self.update_Q(episodes=20)
+            fit_info = self.update_Q(episodes=4)
             if fit_info:
                 history = fit_info.history
                 losses.extend(history['loss'])
@@ -214,13 +212,15 @@ class DeepQLearningAgent(NeuralNetworkAgent):
         Main training or evaluation loop.
         """
         rewards_ = deque(maxlen=1000)
+        wins = 0
 
         ema_reward = 0
 
+        mean_loss = 0
         ema_mean_loss = 0
-        beta_mean_loss = 0.9
+        beta_mean_loss = 0.99
 
-        beta = 0.99
+        beta = 0.994
         total_reward = 0
 
         with tqdm(total=n_episodes, postfix='T=') as t:
@@ -238,19 +238,26 @@ class DeepQLearningAgent(NeuralNetworkAgent):
                 rewards_.append(reward)
                 total_reward += reward
 
+                try:
+                    if reward == self.env.reward_range[-1]:  # e.g reward_range = (-1, 1), where 1 is the win
+                        wins += 1
+                    postfix += f'wins={100*wins/(k+1):.2f}%, '
+                except AttributeError:
+                    wins = 'n/a'
 
                 ema_reward = beta * ema_reward + (1 - beta) * reward
-                postfix += f'avg reward:{ema_reward:.2f}, '
+                postfix += f'reward:{ema_reward/(1-beta**(k+1)):.2f}, '
 
                 if 'mean_loss' in info and info['mean_loss']:
                     mean_loss = info['mean_loss']
                     ema_mean_loss = beta_mean_loss * ema_mean_loss + (1 - beta_mean_loss) * mean_loss
-                postfix += f'mean loss={ema_mean_loss:.2f}, '
+                    #postfix += f'mean loss={ema_mean_loss/(1-beta)**(k+1):.2f}, '
+                postfix += f'mean loss={mean_loss:.3f} '
 
                 if self.eps != None:
                     postfix += f'eps={self.eps:.2e} '
 
-                postfix += f'meanR={np.mean(rewards_):.3f}'
+                #postfix += f'meanR={np.mean(rewards_):.3f}'
 
                 t.postfix = postfix
                 t.update()
@@ -258,7 +265,12 @@ class DeepQLearningAgent(NeuralNetworkAgent):
                 #if k % 500 == 0:
                 #    print(self.predict(9*[0]).reshape((3,3)), f'{k=}')
 
-        print(f'did {n_episodes=}, {total_reward=}, win %: {total_reward / n_episodes * 100}')
+        try:
+            win_percentage = wins / n_episodes * 100
+        except TypeError:
+            win_percentage = 'n/a'
+
+        print(f'did {n_episodes=}, {train=}, {total_reward=} (including negative rewards), win %: {win_percentage:.2f}')
         return total_reward
 
 

@@ -17,6 +17,6 @@ def create_Dense_net1(layers=1, neurons=128, p_dropout=0.2, input_shape=(9,), n_
         net.add(Dense(neurons, activation = 'relu'))
         net.add(Dropout(p_dropout))
 
-    net.add(Dense(n_outputs, activation='sigmoid'))
+    net.add(Dense(n_outputs, activation='tanh'))
 
     return net

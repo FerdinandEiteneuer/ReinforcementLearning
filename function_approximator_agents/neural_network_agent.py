@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow
+import gym
 
 
 class NeuralNetworkAgent:
@@ -7,6 +8,8 @@ class NeuralNetworkAgent:
     def __init__(self, env, epsilon_scheduler, policy, gamma):
 
         self.env = env
+        self.env.dtype_state = np.ndarray
+
         self.epsilon_scheduler = epsilon_scheduler
         self.eps = None
         self.gamma = gamma
@@ -18,6 +21,15 @@ class NeuralNetworkAgent:
         self._prediction_network = 'Q'
 
         self.set_policy(policy)
+
+    def train_and_play(self, train=8000, play=1000, repeat=1, func=None):
+        for i in range(repeat):
+            print(f'\ntrain/play loop #{i+1}')
+            self.train(n_episodes=train)
+            self.play(n_episodes=play)
+
+            if func:
+                func(self)
 
     def set_policy(self, policy):
         if policy == 'eps_greedy':
@@ -60,7 +72,14 @@ class NeuralNetworkAgent:
     def predict(self, state):
 
         n_actions = self.env.action_space.n
-        size_obs_space = self.env.observation_space.n
+
+        if isinstance(self.env.observation_space, gym.spaces.tuple.Tuple):
+            size_obs_space = len(self.env.observation_space)
+        elif isinstance(self.env.observation_space, gym.spaces.discrete.Discrete):
+            size_obs_space = self.env.observation_space.n
+        else:
+            raise NotImplementedError('do not understand environment.')
+
         shape = (n_actions, n_actions + size_obs_space)
 
         actions_one_hot = np.eye(n_actions)
