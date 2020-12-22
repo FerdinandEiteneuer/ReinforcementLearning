@@ -1,6 +1,7 @@
 import numpy as np
 np.set_printoptions(precision=3, suppress=True)
 
+from environments.kaggle_wrapper import KaggleTicTacToe, KaggleConnectX
 import gym
 
 import plotly
@@ -14,10 +15,10 @@ def q_init(state, action):
     return 0
 
 def eps_scheduler(episodes):
+    return max(0.1, N0/(N0 + episodes))
+    return 1
     return N0 / (N0 + episodes)
     return 1/episodes
-    #return 0.1
-    return max(0.1, N0/(N0 + episodes))
 
 def alpha_scheduler(episodes):
     return 0.1
@@ -50,12 +51,15 @@ if __name__ == '__main__':
     #env = gym.make('Blackjack-v0')
 
     #env = gym.make('FrozenLake-v0')
-    env = gym.make('FrozenLake8x8-v0')
+    #env = gym.make('FrozenLake8x8-v0')
 
 
     #env = tabular_agents.envs.WindyGridWorld('windy_gridworld', 'standard')
     #env = tabular_agents.envs.WindyGridWorld('no_wind', 'standard')
     #env = tabular_agents.envs.Easy21()
+
+    #env = KaggleConnectX(rows=3, columns=3, inarow=3, dtype_state='tuple')
+    env = KaggleTicTacToe()
 
     r = env.reset
     s = env.step
@@ -102,8 +106,8 @@ if __name__ == '__main__':
     #agent = qlearning_agent
     agent = sarsalambda_agent
 
-
-    agent.learn_and_test(n_train=1*10**5, n_test=10**3, random=False, print_valuefunction=False)
+    #agent.play(episodes=1000, random=True)
+    agent.learn_and_test(n_train=5*10**3, n_test=2*10**3, random=False, print_valuefunction=False)
 
     try:
         env.print_action_valuefunction(agent.Q)
@@ -112,7 +116,8 @@ if __name__ == '__main__':
         #print('could not print actionvalue function from env function')
 
     try:
-        agent.print_actionvalue_function()
+        pass
+        #agent.print_actionvalue_function()
     except:
         pass
         #print('could not print actionvalue function from agent')

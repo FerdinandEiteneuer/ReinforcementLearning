@@ -2,6 +2,7 @@ import numpy as np
 import contextlib
 import gym
 from gym.spaces.discrete import Discrete
+from gym.spaces.tuple import Tuple
 
 
 with contextlib.redirect_stdout(None):
@@ -16,18 +17,34 @@ class KaggleEnvWrapper():
     This means, reset(), step() return the appropriate values.
     In addition, action_space and observation_space are defined.
     """
-    def __init__(self):
-        pass
+    def __init__(self, dtype_state=np.ndarray):
+
+        supported_types = [np.ndarray, tuple]
+        if dtype_state not in supported_types:
+            raise NotImplementedError(f'datatype {dtype_state} not supported. Can only use {supported_types}.')
+        else:
+            self.dtype_state = dtype_state
 
     def __str__(self):
         return self.env.render(mode='ansi')
 
-    def get_random_action(self):
-        raise NotImplementedError('The derived class must implement this.a')
+    def _transform(self, state):
+        """
+        Different agents require different datatypes to work with.
+        Whenever we return the state to an agent, transform the internal numpy
+        representation accordingly.
+        """
+        if self.dtype_state == np.ndarray:
+            return np.array(state)
+        elif self.dtype_state == tuple:
+            return tuple(state)
+
+
 
     def parse_observation(self, observation):
         terminal = observation[0]['status'] == 'DONE'
         reward = observation[0]['reward']
+
         state = np.array(observation[0]['observation']['board'])
 
         status1 = observation[0]['status']
@@ -52,7 +69,8 @@ class KaggleEnvWrapper():
             raise RuntimeError('after player moved, he is not in state inactive')
 
         if terminal:
-            return self.state, reward, terminal, info  # the plyaer won
+            state = self._transform(self.state)
+            return state, reward, terminal, info  # the player won
 
 
 
@@ -67,7 +85,8 @@ class KaggleEnvWrapper():
             print(action, action_opponent, reward, self.state, info)
             raise RuntimeError('invalid opponent action')
 
-        return self.state, reward, terminal, info
+        state = self._transform(self.state)
+        return state, reward, terminal, info
 
     def reset(self):
         """
@@ -75,18 +94,27 @@ class KaggleEnvWrapper():
         """
         observation = self.env.reset()
         self.state = np.array(self.get_state(observation))
-        return self.state
+        return self._transform(self.state)
 
     def get_state(self, observation):
         board = observation[0]['observation']['board']
         return board
 
+    def get_allowed_actions(self):
+        raise NotImplementedError('The derived class must implement this.a')
+
+    def get_random_action(self):
+        """
+        Returns a randomly sampled action.
+        """
+        allowed = self.get_allowed_actions()
+        return int(np.random.choice(allowed))
 
 class KaggleConnectX(KaggleEnvWrapper):
 
-    def __init__(self, rows=6, columns=7, inarow=4):
+    def __init__(self, rows=6, columns=7, inarow=4, dtype_state='numpy'):
 
-        super().__init__()
+        super().__init__(dtype_state=dtype_state)
 
         config = {'rows': rows, 'columns': columns, 'inarow': inarow}
 
@@ -98,18 +126,19 @@ class KaggleConnectX(KaggleEnvWrapper):
 
         # make environment more gym compliant
         self.action_space = Discrete(columns)
-        self.observation_space = Discrete(rows * columns)
         self.action_space.sample = self.get_random_action
+
+        #self.observation_space = Discrete(rows * columns)
+        self.observation_space = Tuple(rows * columns * [Discrete(3)])
 
         self.rows = rows
         self.columns = columns
+        self.reward_range = (-1, 1)
 
-    def get_random_action(self):
-        """
-        Returns a randomly sampled action.
-        """
+    def get_allowed_actions(self):
         first_row = self.state[:self.columns]
-        return int(np.random.choice(np.where(first_row == 0)[0]))
+        allowed = np.where(first_row == 0)[0]
+        return allowed
 
 
 class KaggleTicTacToe(KaggleEnvWrapper):
@@ -118,7 +147,9 @@ class KaggleTicTacToe(KaggleEnvWrapper):
 
     The average winrate for a random player vs a random opponent is about 30%.
     """
-    def __init__(self):
+    def __init__(self, dtype_state=np.ndarray):
+
+        super().__init__(dtype_state=dtype_state)
 
         self.env = make("tictactoe", debug=True)
 
@@ -126,17 +157,20 @@ class KaggleTicTacToe(KaggleEnvWrapper):
 
         # make environment more gym compliant
         self.action_space = Discrete(9)
-        self.observation_space = Discrete(9)
-
         self.action_space.sample = self.get_random_action
 
+        #self.observation_space = Discrete(9)
+        #self.observation_space = Tuple([Discrete(3), Discrete(3)])
+        self.observation_space = Tuple(9*[Discrete(3)])
 
-    def get_random_action(self):
+        self.reward_range = (-1, 1)
+
+    def get_allowed_actions(self):
         """
-        Returns a randomly sampled action.
+        Returns the allowed actions.
         """
-        #print('tactactoe env sampling random action', self.state, np.random.choice(np.where(self.state == 0)[0]))
-        return int(np.random.choice(np.where(self.state == 0)[0]))
+        return np.where(self.state == 0)[0]
+
 
 
 if __name__ == '__main__':
@@ -147,5 +181,5 @@ if __name__ == '__main__':
         print(f'{reward=}, {terminal=}')
 
 
-    env = KaggleConnectX(rows=5, columns=5, inarow=3)
+    env = KaggleConnectX(rows=3, columns=3, inarow=3)
     state = env.reset()

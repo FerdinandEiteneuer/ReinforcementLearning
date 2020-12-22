@@ -10,6 +10,8 @@ class TabularAgent:
     def __init__(self, env, gamma, q_value_initialization,
                  epsilon_scheduler, alpha_scheduler=None, policy=None):
 
+        env.dtype_state = tuple
+
         self.env = env
         self.gamma = gamma
         self.alpha = 0.1
@@ -217,8 +219,24 @@ class TabularAgent:
         """
         Picks the greedy action, given a state.
         """
+        try:
+            allowed = self.env.get_allowed_actions()
+            additive_mask = - np.inf * np.ones(self.env.action_space.n)  # by default, everything is allowed
+            additive_mask[allowed] = 0
+        except AttributeError:
+            additive_mask = np.zeros(self.env.action_space.n)  # by default, everything is allowed
 
-        Q = self.Q.predict([state])[0]
+        if isinstance(self.Q, dict):
+            Qs = np.array([self.Q[state, a] for a in self.A])
+        elif isinstance(self.Q, np.ndarray):
+            Qs = self.Q[state]
+            assert len(Qs) == self.env.action_space.n
+        else:
+            raise ValueError('Q is neither dict nor numpy array.')
+
+        valid_Qs = Qs + additive_mask  # masks out non allowed actions by setting their q values to -inf
+        action = int(np.argmax(valid_Qs))
+        return action
 
     def print_actionvalue_function(self):
         """
@@ -293,6 +311,8 @@ class TabularAgent:
         max_consecutive_wins = 0
         consecutive_wins = 0
         wins = 0
+        losses = 0
+        draws = 0
         episode_lengths = []
 
         for i in range(episodes):
@@ -308,26 +328,29 @@ class TabularAgent:
 
                 state, reward, done, info = self.env.step(action)
 
-
                 if done:
                     break
 
             if reward == 1:
-
                 wins += 1
                 consecutive_wins += 1
 
                 max_consecutive_wins = max(max_consecutive_wins, consecutive_wins)
 
             else:
-
                 consecutive_wins = 0
+
+            if reward == 0:
+                draws += 1
+            elif reward == -1:
+                losses += 1
 
             episode_lengths.append(k+1)
 
         win_percentage = 100 * wins / episodes
 
-        print(f'played {episodes} games:\n\twins:{wins}\n\tlosses:{episodes-wins}\n\twin ratio:{win_percentage}%\n\tlargest winstreak: {max_consecutive_wins}\n\tavg episode lengths: {sum(episode_lengths)/len(episode_lengths)}')
+        if print_statistic:
+            print(f'played {episodes} games:\n\t{wins=}\n\t{losses=}\n\t{draws=}\n\twin ratio={win_percentage}%\n\tlargest winstreak: {max_consecutive_wins}\n\tavg episode lengths: {sum(episode_lengths)/len(episode_lengths)}')
         return wins
 
     def learn_and_test(self, n_train, n_test=2000, random=False, print_valuefunction=True):
