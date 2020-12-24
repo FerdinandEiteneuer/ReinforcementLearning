@@ -256,10 +256,6 @@ class TicTacToe:
         if self.t == 9:
             return True, None
 
-        if np.random.uniform() < 0.4:
-            return True, self.player1
-        else:
-            return False, None
         # horizontal
         first_row = self.board[0:3]
         if np.all(first_row == self.player1):

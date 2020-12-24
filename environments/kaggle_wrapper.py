@@ -100,8 +100,12 @@ class KaggleEnvWrapper():
         board = observation[0]['observation']['board']
         return board
 
-    def get_allowed_actions(self):
-        raise NotImplementedError('The derived class must implement this.a')
+    def get_allowed_actions(self, state=None):
+        """
+        Gets all allowed actions, given a state.
+        If the allowed actions depend on the state, the environment must override this method
+        """
+        return range(self.env.action_space.n)
 
     def get_random_action(self):
         """
@@ -111,8 +115,10 @@ class KaggleEnvWrapper():
         return int(np.random.choice(allowed))
 
 class KaggleConnectX(KaggleEnvWrapper):
-
-    def __init__(self, rows=6, columns=7, inarow=4, dtype_state='numpy'):
+    """
+    Info for rows=3, colums=3, inarow=3 random vs random policy leads to 54% winrate.
+    """
+    def __init__(self, rows=6, columns=7, inarow=4, dtype_state=np.ndarray):
 
         super().__init__(dtype_state=dtype_state)
 
@@ -135,8 +141,11 @@ class KaggleConnectX(KaggleEnvWrapper):
         self.columns = columns
         self.reward_range = (-1, 1)
 
-    def get_allowed_actions(self):
-        first_row = self.state[:self.columns]
+    def get_allowed_actions(self, state=None):
+        if not state:
+            state = self.state
+
+        first_row = state[:self.columns]
         allowed = np.where(first_row == 0)[0]
         return allowed
 
@@ -165,12 +174,13 @@ class KaggleTicTacToe(KaggleEnvWrapper):
 
         self.reward_range = (-1, 1)
 
-    def get_allowed_actions(self):
+    def get_allowed_actions(self, state):
         """
         Returns the allowed actions.
         """
-        return np.where(self.state == 0)[0]
-
+        if not state:
+            state = self.state
+        return np.where(state == 0)[0]
 
 
 if __name__ == '__main__':
