@@ -1,4 +1,4 @@
-# reinforcement_learning
+# Reinforcement Learning
 
 This codebase implements several rl agents. For now, these are
 
