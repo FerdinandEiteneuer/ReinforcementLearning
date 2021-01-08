@@ -10,6 +10,18 @@ with contextlib.redirect_stdout(None):
     from kaggle_environments import make
 
 
+class Env:
+
+    def __init__(self):
+        pass
+
+    def player_action(self, action):
+
+        pass
+
+    def opponent_action(self, action):
+        pass
+
 class KaggleEnvWrapper():
     """
     Wrapper around the environments 'connectx' and 'tictactoe'
@@ -17,7 +29,9 @@ class KaggleEnvWrapper():
     This means, reset(), step() return the appropriate values.
     In addition, action_space and observation_space are defined.
     """
-    def __init__(self, dtype_state=np.ndarray):
+    def __init__(self, dtype_state=np.ndarray, opponent_policy='random'):
+
+        self.opponent_policy = opponent_policy
 
         supported_types = [np.ndarray, tuple]
         if dtype_state not in supported_types:
@@ -40,7 +54,6 @@ class KaggleEnvWrapper():
             return tuple(state)
 
 
-
     def parse_observation(self, observation):
         terminal = observation[0]['status'] == 'DONE'
         reward = observation[0]['reward']
@@ -56,8 +69,58 @@ class KaggleEnvWrapper():
 
         return state, reward, terminal, info
 
-    def step(self, action, action_opponent='random'):
 
+    def player_action(self, action):
+
+        action = int(action)
+        # print('EXECUTING PLAYER STEP')
+
+        observation = self.env.step([action, None])
+        self.state, reward, terminal, info = self.parse_observation(observation)
+
+        if not info['valid']:
+            print(action, terminal, reward, self.state, info)
+            raise RuntimeError('player chose non valid action')
+        if info['player_active']:
+            print(action, terminal, reward, self.state, info)
+            raise RuntimeError('after player moved, he is not in state inactive')
+
+        return self.state, reward, terminal, info
+
+    def execute_opponent_action(self, action_opponent=None):
+        # print('EXECUTING OPPONENT STEP')
+        observation = self.env.step([None, int(action_opponent)])
+
+        self.state, reward, terminal, info = self.parse_observation(observation)
+        if not info['valid']:
+            print(action_opponent, action_opponent, reward, self.state, info)
+            raise RuntimeError('invalid opponent action')
+
+        state = self._transform(self.state)
+        return state, reward, terminal, info
+
+    def step(self, action, action_opponent):
+        """
+        Executes one complete turn. Note: action_opponent is a function receiving the intermediate
+        state after the environment has executed the players step.
+        """
+        state, reward, terminal, info = self.player_action(action)
+
+        if terminal:
+            state = self._transform(self.state)
+            return state, reward, terminal, info  # the player won
+
+        action_opp = action_opponent(state)  # calculate the opponents action
+
+        state, reward, terminal, info = self.execute_opponent_action(action_opp)
+        state = self._transform(self.state)
+        return state, reward, terminal, info
+
+    def step_DEPRECATED(self, action, action_opponent=None):
+        """
+        Deprecated
+        """
+        action = int(action)
         #print('EXECUTING PLAYER STEP')
         self.state, reward, terminal, info = self.parse_observation(self.env.step([action, None]))
 
@@ -72,13 +135,18 @@ class KaggleEnvWrapper():
             state = self._transform(self.state)
             return state, reward, terminal, info  # the player won
 
-
-
-        if isinstance(action_opponent, str) and action_opponent == 'random':
-            action_opponent = self.get_random_action()
+        if action_opponent is None:
+            if self.opponent_policy == 'random':
+                action_opponent = self.get_random_action()
+            elif self.opponent_policy == 'first_allowed':
+                action_opponent = int(self.get_allowed_actions()[0])
+            else:
+                raise ValueError('no opponent action or strategy provided')
+        elif action_opponent:
+            action_opp = action_opponent(self.state)
 
         #print('EXECUTING OPPONENT STEP')
-        observation = self.env.step([None, action_opponent])
+        observation = self.env.step([None, action_opp])
 
         self.state, reward, terminal, info = self.parse_observation(observation)
         if not info['valid']:
@@ -117,10 +185,11 @@ class KaggleEnvWrapper():
 class KaggleConnectX(KaggleEnvWrapper):
     """
     Info for rows=3, colums=3, inarow=3 random vs random policy leads to 54% winrate.
+             4/4/3 -> random policy -> 62% winrate
     """
-    def __init__(self, rows=6, columns=7, inarow=4, dtype_state=np.ndarray):
+    def __init__(self, rows=6, columns=7, inarow=4, opponent_policy='random', dtype_state=np.ndarray):
 
-        super().__init__(dtype_state=dtype_state)
+        super().__init__(dtype_state=dtype_state, opponent_policy=opponent_policy)
 
         config = {'rows': rows, 'columns': columns, 'inarow': inarow}
 
@@ -142,7 +211,8 @@ class KaggleConnectX(KaggleEnvWrapper):
         self.reward_range = (-1, 1)
 
     def get_allowed_actions(self, state=None):
-        if not state:
+
+        if state is None:
             state = self.state
 
         first_row = state[:self.columns]
@@ -174,7 +244,7 @@ class KaggleTicTacToe(KaggleEnvWrapper):
 
         self.reward_range = (-1, 1)
 
-    def get_allowed_actions(self, state):
+    def get_allowed_actions(self, state=None):
         """
         Returns the allowed actions.
         """
@@ -192,4 +262,4 @@ if __name__ == '__main__':
 
 
     env = KaggleConnectX(rows=3, columns=3, inarow=3)
-    state = env.reset()
+    #state = env.reset()

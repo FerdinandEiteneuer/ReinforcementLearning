@@ -2,10 +2,9 @@ import numpy as np
 import tensorflow
 import gym
 
-
 class NeuralNetworkAgent:
 
-    def __init__(self, env, epsilon_scheduler, policy, gamma):
+    def __init__(self, env, epsilon_scheduler, policy, gamma, self_play):
 
         self.env = env
         self.env.dtype_state = np.ndarray
@@ -15,6 +14,7 @@ class NeuralNetworkAgent:
         self.gamma = gamma
 
         self.default_policy = policy
+        self.self_play = self_play
 
         # neural network
         self.Q = None
@@ -22,14 +22,25 @@ class NeuralNetworkAgent:
 
         self.set_policy(policy)
 
-    def train_and_play(self, train=8000, play=1000, repeat=1, func=None):
+        if self_play:
+            self.set_opponent_policy('greedy')
+
+    def train_and_play(self, train=8000, play=1000, repeat=1, funcs=[]):
         for i in range(repeat):
             print(f'\ntrain/play loop #{i+1}')
             self.train(n_episodes=train)
             self.play(n_episodes=play)
 
-            if func:
+            for func in funcs:
                 func(self)
+
+    def set_opponent_policy(self, policy):
+        if policy == 'random':
+            self.opponent_policy = self.get_random_action
+        elif policy == 'greedy':
+            self.opponent_policy = self.get_ideal_opponent_action
+        else:
+            raise ValueError(f'Opponent policy was {policy}, but must be "greedy" or "random".')
 
     def set_policy(self, policy):
         if policy == 'eps_greedy':
@@ -105,33 +116,85 @@ class NeuralNetworkAgent:
         #print(qs)
         return qs
 
+    def get_ideal_opponent_action(self, s_intermediate):
+        """
+        A function taking a state, returning a function which returns the optimal opponent action.
+        After the environment responded to the selected player action, it is
+        in an intermediary state s_intermed
+
+        1. get all available opponent actions from s_intermed
+           make a list q_values
+        2. for all these potential opponent actions:
+            collect s_next if the opponent would take that action.
+            from s_next, get Q_max = max a' Q(s_next, a')
+            insert Q_max in q_values
+        3. find minimum of q_values
+        4. the action responding to this minimum (min-maxxed) will be the one the opponent actually takes
+
+        """
+        #return self.get_random_action()
+
+        # make a backup of environment state
+        #env_original = self.env.env.state
+        env_original = self.env.env.clone()
+
+        s_intermed = np.copy(self.env.state)
+        original_env_state = self.env.env.state
+
+        possible_opponent_actions = self.get_allowed_actions(s_intermed)
+
+        min_max_Q = np.inf
+        min_max_action = None
+
+        for a in possible_opponent_actions:
+
+            # NOTE: if the whole thing here works, replace by env.state = s_entermed, that should work too and is probably 100 times faster
+
+            #self.env.env = env_original.clone()
+            self.env.env.state = original_env_state
+
+            s_next, _, _, _ = self.env.execute_opponent_action(a)
+
+            # next thing to improve: just put all s_next in one array and run predict only once
+            q_max, index_max = self.analyse_maxQ(s_next)
+
+            if q_max < min_max_Q:
+                min_max_Q = q_max
+                min_max_action = a
+
+        # return environment back to its original state
+        self.env.state = s_intermed
+        self.env.env = env_original
+        return min_max_action
+
+    def get_allowed_actions(self, state=None):
+        """
+        Returns all allowed actions.
+        If no state is given, the current state of the environment is used.
+        """
+        try:
+            allowed_actions = self.env.get_allowed_actions(state=state)
+        except AttributeError as e:
+            allowed_actions = range(self.env.action_space.n)
+
+        return allowed_actions
+
     def analyse_maxQ(self, state):
 
         #connectx
         qs = self.predict(state)
+        allowed_actions = self.get_allowed_actions(state)
 
         index_max = 0
         q_max = - np.inf
         for i, q in enumerate(qs):
-            if self.env.state[i] != 0:  # WARNING this means only s != 0 is still valid move. WARNING
+
+            if i not in allowed_actions:
                 continue  # only select legal actions
             if q > q_max:
                 q_max = q
                 index_max = i
 
-        """
-        #tictactoe
-        q = self.predict(state)
-
-        index_max = 0
-        q_max = - np.inf
-        for i, s in enumerate(state):
-            if s != 0:  # WARNING this means only s != 0 is still valid move. WARNING
-                continue  # only select legal actions
-            if q[i] > q_max:
-                q_max = q[i]
-                index_max = i
-        """
         return q_max, index_max
 
     def get_greedy_action(self, state):
@@ -148,4 +211,6 @@ class NeuralNetworkAgent:
         """
         q_max, _ = self.analyse_maxQ(state)
         return q_max
+
+
 

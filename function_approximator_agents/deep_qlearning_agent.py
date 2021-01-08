@@ -22,9 +22,14 @@ class DeepQLearningAgent(NeuralNetworkAgent):
                  size_Q_memory=(1024, 10),
                  fixed_target_weights=True,
                  update_period_fixed_target_weights=400,
-                 gamma=1):
+                 gamma=1,
+                 self_play=False):
 
-        super().__init__(env=env, policy=policy, epsilon_scheduler=epsilon_scheduler, gamma=gamma)
+        super().__init__(env=env,
+                         policy=policy,
+                         epsilon_scheduler=epsilon_scheduler,
+                         gamma=gamma,
+                         self_play=self_play)
 
         if Q is not None:
             self.Q = Q
@@ -38,12 +43,12 @@ class DeepQLearningAgent(NeuralNetworkAgent):
             self.Q = function_approximator_agents.utils.create_Dense_net1(
                 input_shape=self.Q_input_shape,
                 n_outputs=1,
-                layers=1,
-                neurons=1024,
+                layers=2,
+                neurons=512,
                 p_dropout=0.3,
             )
 
-        self.starting_learning_rate = 0.0001
+        self.starting_learning_rate = 0.00001
 
         optimizer = tf.keras.optimizers.Adam(
             learning_rate=self.starting_learning_rate,
@@ -53,6 +58,7 @@ class DeepQLearningAgent(NeuralNetworkAgent):
             amsgrad=False
         )
 
+        #self.loss = 'mean_absolute_error'
         self.loss = 'mean_squared_error'
 
         self.Q.compile(
@@ -101,7 +107,7 @@ class DeepQLearningAgent(NeuralNetworkAgent):
         rewards = self.Q_memory[:, -1]
         return state_action_inputs, rewards
 
-    def update_Q(self, batch_size=128, episodes=1):
+    def update_Q(self, batch_size=128, episodes=2):
         if self.episodes > self.size_Q_memory:
 
             state_action_inputs, rewards = self.training_data()
@@ -126,7 +132,7 @@ class DeepQLearningAgent(NeuralNetworkAgent):
 
         opt = tf.keras.optimizers.Adam(
             learning_rate=self.starting_learning_rate
-        )  # fresh optimizer, since we will be updating towards new goals
+        )  # fresh optimizer, since we will be updating towards new goals. (Old opt. weights are irrelevant.)
 
         self.Q_fixed_weights = tf.keras.models.clone_model(self.Q)
         self.Q_fixed_weights.set_weights(current_weights)
@@ -150,8 +156,9 @@ class DeepQLearningAgent(NeuralNetworkAgent):
         if self.fixed_target_weights and self.episodes % self.update_period_fixed_target_weights == 0:
             self.update_fixed_target_weights()
 
+        # train the neural network
         if self.episodes % 20 == 0:
-            fit_info = self.update_Q(episodes=4)
+            fit_info = self.update_Q(episodes=3)
             if fit_info:
                 history = fit_info.history
                 losses.extend(history['loss'])
@@ -160,7 +167,12 @@ class DeepQLearningAgent(NeuralNetworkAgent):
 
             action = self.policy(state)
 
-            next_state, reward, terminal, info = self.env.step(action)
+            if self.self_play:
+                opponent_action = self.get_ideal_opponent_action
+            else:
+                opponent_action = self.get_random_action
+
+            next_state, reward, terminal, info = self.env.step(action, opponent_action)
 
             if not terminal:
                 target = reward + self.gamma * self.get_maxQ(next_state)
@@ -171,8 +183,6 @@ class DeepQLearningAgent(NeuralNetworkAgent):
                 act = self.env.action_space.n * [0]
                 act[action] = 1
                 self.Q_memory[self.episodes % self.size_Q_memory] = list(state) + act + [target]  # add to memory
-
-
 
             state = next_state
 
@@ -198,7 +208,7 @@ class DeepQLearningAgent(NeuralNetworkAgent):
 
             # episode_memory.append((state, action, reward, terminal))
 
-            next_state, reward, terminal, info = self.env.step(action)
+            next_state, reward, terminal, info = self.env.step(action, self.opponent_policy)
 
             state = next_state
 
@@ -273,17 +283,24 @@ class DeepQLearningAgent(NeuralNetworkAgent):
         print(f'did {n_episodes=}, {train=}, {total_reward=} (including negative rewards), win %: {win_percentage:.2f}')
         return total_reward
 
-
-    def train(self, n_episodes, policy='eps_greedy'):
+    def train(self, n_episodes):
         """
         Train the agent n_episodes
         """
-        self.set_policy(policy)
+        self.set_policy('eps_greedy')
+        
+        if self.self_play:
+            self.set_opponent_policy('greedy')
+            
         return self._loop(n_episodes, train=True)
 
-
-    def play(self, n_episodes, policy='greedy'):
-        self.set_policy(policy)
+    def play(self, n_episodes, opponent_policy='random'):
+        self.set_policy('greedy')
+        self.set_opponent_policy(opponent_policy)
+        
+        #self.set_policy('random')
+        #self.set_opponent_policy('greedy')
+        
         return self._loop(n_episodes, train=False)
 
 
