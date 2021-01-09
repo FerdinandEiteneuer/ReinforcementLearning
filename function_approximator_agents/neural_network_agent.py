@@ -7,6 +7,7 @@ class NeuralNetworkAgent:
     def __init__(self, env, epsilon_scheduler, policy, gamma, self_play):
 
         self.env = env
+        self.nb_actions = self.env.action_space.n
         self.env.dtype_state = np.ndarray
 
         self.epsilon_scheduler = epsilon_scheduler
@@ -80,41 +81,29 @@ class NeuralNetworkAgent:
         else:
             return self.get_greedy_action(state)
 
-    def predict(self, state):
 
-        n_actions = self.env.action_space.n
-
-        if isinstance(self.env.observation_space, gym.spaces.tuple.Tuple):
-            size_obs_space = len(self.env.observation_space)
-        elif isinstance(self.env.observation_space, gym.spaces.discrete.Discrete):
-            size_obs_space = self.env.observation_space.n
-        else:
-            raise NotImplementedError('do not understand environment.')
-
-        shape = (n_actions, n_actions + size_obs_space)
-
-        actions_one_hot = np.eye(n_actions)
-
-        values = np.zeros(shape)
-        values[:, :size_obs_space] = state
-        values[:, size_obs_space:] = actions_one_hot
-        # if state is [12,52,21] and we have actions 0, 1, 2
-        # values = [[12, 52, 21, 1, 0, 0],
-        #           [12, 52, 21, 0, 1, 0],
-        #           [12, 52, 21, 0, 0, 1]]
-
-        #print('\nIN PREDICT..INPUT IS', state, '\n', values)
-
-        if self._prediction_network == 'Q':
+    def predict(self, state, network):
+        """
+        Evaluates the state for the given network.
+        """
+        if network == 'Q':
             model = self.Q
-        elif self._prediction_network == 'Q_fixed_weights':
+        elif network == 'Q_fixed_weights':
             model = self.Q_fixed_weights
         else:
-            raise ValueError(f'could not find prediction network')
+            raise ValueError(f'Tried to access {network=}, but must be either \'Q\' or \'Q_fixed_weights\'')
 
-        qs = model(values).numpy()  # use __call__ instead of predict, as its faster for smaller batch sizes
-        #print(qs)
+        # we use model's __call__ instead of using model.predict(...)
+        # It is faster for smaller batch sizes
+        qs = model(np.expand_dims(state, axis=0)).numpy()[0]
+        assert qs.shape == (self.nb_actions, ), f'{qs.shape=}, {self.nb_actions=}'
         return qs
+
+    def predict_Q(self, state):
+        return self.predict(state, 'Q')
+
+    def predict_Q_fixed_weights(self, state):
+        return self.predict(state, 'Q_fixed_weights')
 
     def get_ideal_opponent_action(self, s_intermediate):
         """
@@ -182,7 +171,7 @@ class NeuralNetworkAgent:
     def analyse_maxQ(self, state):
 
         #connectx
-        qs = self.predict(state)
+        qs = self.predict(state, 'Q')
         allowed_actions = self.get_allowed_actions(state)
 
         index_max = 0

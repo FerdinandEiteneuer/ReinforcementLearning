@@ -99,7 +99,7 @@ class KaggleEnvWrapper():
         state = self._transform(self.state)
         return state, reward, terminal, info
 
-    def step(self, action, action_opponent):
+    def step(self, action, action_opponent='random'):
         """
         Executes one complete turn. Note: action_opponent is a function receiving the intermediate
         state after the environment has executed the players step.
@@ -110,7 +110,10 @@ class KaggleEnvWrapper():
             state = self._transform(self.state)
             return state, reward, terminal, info  # the player won
 
-        action_opp = action_opponent(state)  # calculate the opponents action
+        if action_opponent == 'random':
+            action_opp = self.get_random_action()
+        else:
+            action_opp = action_opponent(state)  # calculate the opponents action
 
         state, reward, terminal, info = self.execute_opponent_action(action_opp)
         state = self._transform(self.state)
@@ -224,7 +227,7 @@ class KaggleTicTacToe(KaggleEnvWrapper):
     """
     This class is a wrapper class around kaggles TicTacToe environment.
 
-    The average winrate for a random player vs a random opponent is about 30%.
+    The average winrate for a random player vs a random opponent is about 58%.
     """
     def __init__(self, dtype_state=np.ndarray):
 
@@ -248,7 +251,7 @@ class KaggleTicTacToe(KaggleEnvWrapper):
         """
         Returns the allowed actions.
         """
-        if not state:
+        if state is None:
             state = self.state
         return np.where(state == 0)[0]
 

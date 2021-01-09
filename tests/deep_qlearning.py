@@ -70,8 +70,8 @@ if __name__ == '__main__':
 
     #set_random_seeds(123)
 
-    #env = KaggleTicTacToe()
-    env = KaggleConnectX(rows=6, columns=7, inarow=4)
+    env = KaggleTicTacToe()
+    #env = KaggleConnectX(rows=6, columns=7, inarow=4)
 
     #time_(env, 10000)
 
@@ -79,8 +79,10 @@ if __name__ == '__main__':
 
     # one memory point would be [state, action(one_hot), target]
     # the last one is the target r + max_a' Q(s',a', fixed_weights)
-    size_memory = 2*1024, len(env.observation_space) + env.action_space.n + 1
-    update_period = 500
+
+    #size_memory = 2*1024, len(env.observation_space) + env.action_space.n + 1
+    size_memory = 4*512
+    update_period = 2*500
 
     agent = DeepQLearningAgent(
         env=env,
@@ -91,10 +93,10 @@ if __name__ == '__main__':
         size_Q_memory=size_memory,
         fixed_target_weights=True,
         update_period_fixed_target_weights=update_period,
-        self_play=True,
+        self_play=False,
     )
 
-    #for i in range(10): agent.play(5000, policy='random')
+    #for i in range(10): agent.play(5000, opponent_policy='random')
     #sys.exit()
 
     #predict_starting_position(agent)
@@ -113,16 +115,3 @@ if __name__ == '__main__':
 
     print(agent.Q.weights[0][0][:35])
 
-    """
-    #total_reward = agent.play(10000, policy='random') # random play: about ~29% winrate
-    
-    for i in range(5):
-        print('\n\nTRAINING / PLAY LOOP', i)
-        agent.train(8000, policy='eps_greedy')
-        agent.play(1000, policy='greedy')
-
-        print('starting position after train')
-        predict_starting_position(agent)
-    """
-    #print(f'TESTING AGENT IN RANDOM PLAY\n')
-    #print(total_reward)

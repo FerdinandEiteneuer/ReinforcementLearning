@@ -58,8 +58,8 @@ if __name__ == '__main__':
     #env = tabular_agents.envs.WindyGridWorld('no_wind', 'standard')
     #env = tabular_agents.envs.Easy21()
 
-    env = KaggleConnectX(rows=3, columns=3, inarow=3)
-    #env = KaggleTicTacToe()
+    #env = KaggleConnectX(rows=3, columns=3, inarow=3)
+    env = KaggleTicTacToe()
 
     r = env.reset
     s = env.step
@@ -106,10 +106,10 @@ if __name__ == '__main__':
     #agent = sarsalambda_agent
     agent = qlearning_agent
 
-    agent.play(episodes=1000, random=True)
-    #agent.learn_and_test(n_train=2*10**5, n_test=3*10**3, random=False, print_valuefunction=False)
-    #agent.learn_and_test(n_train=2*10**5, n_test=3*10**3, random=False, print_valuefunction=False)
-    #agent.learn_and_test(n_train=2*10**5, n_test=3*10**4, random=False, print_valuefunction=False)
+    agent.learn_and_test(n_train=2*10**4, n_test=3*10**3, random=False, print_valuefunction=False)
+    agent.learn_and_test(n_train=2*10**4, n_test=3*10**3, random=False, print_valuefunction=False)
+    agent.learn_and_test(n_train=2*10**4, n_test=3*10**4, random=False, print_valuefunction=False)
+    #agent.play(episodes=1000, random=True)
 
     try:
         env.print_action_valuefunction(agent.Q)
