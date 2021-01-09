@@ -1,6 +1,14 @@
 import numpy as np
+from inspect import signature
+
 import tensorflow
 import gym
+def is_valid_policy_function(policy):
+    if callable(policy):
+        sig = signature(policy)
+        if len(sig.parameters) == 1:  # this policy must take 1 parameter (state)
+            return True
+    return False
 
 class NeuralNetworkAgent:
 
@@ -17,14 +25,49 @@ class NeuralNetworkAgent:
         self.default_policy = policy
         self.self_play = self_play
 
-        # neural network
+        # neural networks
         self.Q = None
-        self._prediction_network = 'Q'
+        self.Q_fixed_weights = None
 
-        self.set_policy(policy)
+        self.policy = policy
 
         if self_play:
-            self.set_opponent_policy('greedy')
+            self.opponent_policy = 'greedy'
+        else:
+            self.opponent_policy = 'random'
+    
+    @property
+    def policy(self):
+        return self._policy
+
+    @policy.setter
+    def policy(self, policy):
+        if isinstance(policy, str):  # predefined policies
+            if policy == 'random':
+                self._policy = self.get_random_action
+            elif policy == 'greedy':
+                self._policy = self.get_greedy_action
+            elif policy == 'eps_greedy':
+                self._policy = self.get_epsilon_greedy_action
+            else:
+                raise ValueError(f'{policy=}, but only "greedy", "eps_greedy" or "random" are valid.')
+        elif is_valid_policy_function(policy):  # custom policies
+            self._policy = policy
+        else:
+            raise ValueError(f'Object {policy=} is not a proper policy function.')
+
+    @property
+    def opponent_policy(self):
+        return self._opponent_policy
+
+    @opponent_policy.setter
+    def opponent_policy(self, policy):
+        if policy == 'random':
+            self._opponent_policy = self.get_random_action
+        elif policy == 'greedy':
+            self._opponent_policy = self.get_ideal_opponent_action
+        else:
+            raise ValueError(f'Opponent policy was {policy}, but must be "greedy" or "random".')
 
     def train_and_play(self, train=8000, play=1000, repeat=1, funcs=[]):
         for i in range(repeat):
@@ -35,31 +78,11 @@ class NeuralNetworkAgent:
             for func in funcs:
                 func(self)
 
-    def set_opponent_policy(self, policy):
-        if policy == 'random':
-            self.opponent_policy = self.get_random_action
-        elif policy == 'greedy':
-            self.opponent_policy = self.get_ideal_opponent_action
-        else:
-            raise ValueError(f'Opponent policy was {policy}, but must be "greedy" or "random".')
-
-    def set_policy(self, policy):
-        if policy == 'eps_greedy':
-            self.policy = self.get_epsilon_greedy_action
-        elif policy == 'random':
-            self.policy = self.get_random_action
-        elif policy == 'greedy':
-            self.policy = self.get_greedy_action
-        else:
-            raise ValueError(f'Policy was {policy}, but must be "eps_greedy", "greedy" or "random".')
-
     def get_random_action(self, *args):
         """
         Samples a random action from the environment.
         """
-        #print('nnetagent chooses random action')
         action = self.env.action_space.sample()
-        #print('nnetagent done chosing sampling random action', action)
         return action
 
     def get_epsilon_greedy_action(self, state, eps=None):
@@ -168,10 +191,9 @@ class NeuralNetworkAgent:
 
         return allowed_actions
 
-    def analyse_maxQ(self, state):
+    def analyse_maxQ(self, state, network):
 
-        #connectx
-        qs = self.predict(state, 'Q')
+        qs = self.predict(state, network)
         allowed_actions = self.get_allowed_actions(state)
 
         index_max = 0
@@ -190,15 +212,15 @@ class NeuralNetworkAgent:
         """
         Picks the greedy action, given a state.
         """
-        _, index_max = self.analyse_maxQ(state)
+        _, index_max = self.analyse_maxQ(state, 'Q')
         #print('player choosing to get greedy action', state, index_max)
         return index_max
 
-    def get_maxQ(self, state):
+    def get_maxQ(self, state, network):
         """
         Selects maximum Q value for a given state under the assumption that only s != 0 are valid moves.
         """
-        q_max, _ = self.analyse_maxQ(state)
+        q_max, _ = self.analyse_maxQ(state, network)
         return q_max
 
 

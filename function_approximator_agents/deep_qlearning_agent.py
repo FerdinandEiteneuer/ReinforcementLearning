@@ -40,13 +40,13 @@ class DeepQLearningAgent(NeuralNetworkAgent):
         self.Q = function_approximator_agents.utils.create_Dense_net1(
             input_shape=self.Q_input_shape,
             n_outputs=env.action_space.n,
-            layers=1,
+            layers=2,
             neurons=512,
             p_dropout=0.1,
             lambda_regularization=10**(-4),
         )
 
-        self.starting_learning_rate = 0.00001
+        self.starting_learning_rate = 0.000005
 
         optimizer = tf.keras.optimizers.Adam(
             learning_rate=self.starting_learning_rate,
@@ -156,15 +156,13 @@ class DeepQLearningAgent(NeuralNetworkAgent):
     def train_one_episode(self):
         # initialize
         self.episodes += 1
-        terminal = False
 
         state = self.env.reset()
-        #print(f'start: {state=}, {state.shape=}')
-
         losses = []
-        fit_info = None
 
-        # if we do Q learning with fixed target weights.
+        fit_info = None
+        terminal = False
+
         if self.fixed_target_weights:
             if self.episodes % self.update_period_fixed_target_weights == 0:
                 self.update_fixed_target_weights()
@@ -188,25 +186,17 @@ class DeepQLearningAgent(NeuralNetworkAgent):
             next_state, reward, terminal, info = self.env.step(action, opponent_action)
 
             if not terminal:
-                Qs_fixed_weight = self.Q_fixed_weights(np.expand_dims(next_state, axis=0)).numpy()[0]
-                assert Qs_fixed_weight.shape == (self.env.action_space.n, ), Qs_fixed_weight.shape
-                target = reward + self.gamma * np.max(Qs_fixed_weight)
-                #target = reward + self.gamma * self.get_maxQ(next_state)
+                maxQ = self.get_maxQ(next_state, network='Q_fixed_weights')
+                target = reward + self.gamma * maxQ
             else:
                 target = reward
 
             if self.experience_replay:
-                #act = self.env.action_space.n * [0]
-                #act[action] = 1
-                #self.Q_memory[self.episodes % self.size_Q_memory] = list(state) + act + [target]  # add to memory
 
-                #print(f'{state=}, {state.shape=}')
-                targets = self.Q(np.expand_dims(state, axis=0)).numpy()[0]
+                qvalues = self.predict(state, network='Q')
+                qvalues[action] = target
 
-                assert targets.shape == (self.nb_actions, ), f'{targets=}, {targets.shape=}'
-                targets[action] = target
-
-                self.Q_memory[self.episodes % self.size_Q_memory] = list(state) + list(targets)
+                self.Q_memory[self.episodes % self.size_Q_memory] = list(state) + list(qvalues)
 
             state = next_state
 
@@ -311,21 +301,22 @@ class DeepQLearningAgent(NeuralNetworkAgent):
         """
         Train the agent n_episodes
         """
-        self.set_policy('eps_greedy')
-        
+        self.policy = 'eps_greedy'
+
         if self.self_play:
-            self.set_opponent_policy('greedy')
+            self.opponent_policy = 'greedy'
         else:
-            self.set_opponent_policy('random')
+            self.opponent_policy = 'random'
             
         return self._loop(n_episodes, train=True)
 
     def play(self, n_episodes, opponent_policy='random'):
-        self.set_policy('greedy')
-        self.set_opponent_policy(opponent_policy)
+
+        self.policy = 'greedy'
+        self.opponent_policy = opponent_policy
         
-        #self.set_policy('random')
-        #self.set_opponent_policy('greedy')
+        #self.policy = 'random'
+        #self.opponent_policy = 'greedy'
         
         return self._loop(n_episodes, train=False)
 
