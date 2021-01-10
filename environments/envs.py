@@ -1,6 +1,8 @@
 import numpy as np
 import gym
 
+from . import export
+
 grid1 = {
 
     'world': np.array([
@@ -38,7 +40,7 @@ WORLDS = {
     'no_wind': grid2,
 }
 
-
+@export
 class WindyGridWorld:
 
     def __init__(self, world, moves):
@@ -365,6 +367,7 @@ class TicTacToe:
             else:
                 raise e
 
+@export
 class Easy21:
     
     def __init__(self):
