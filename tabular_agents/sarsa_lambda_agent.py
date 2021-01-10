@@ -1,6 +1,14 @@
-from tabular_agents import TabularAgent
+#external libraries
 import numpy as np
+
+# standard libraries
 import sys
+
+# this package
+from tabular_agents import TabularAgent
+
+
+__all__ = ["SarsaLambdaAgent"]
 
 class SarsaLambdaAgent(TabularAgent):
 

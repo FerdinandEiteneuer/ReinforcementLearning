@@ -1,14 +1,15 @@
+# external libraries
 import numpy as np
-import contextlib
-import gym
 from gym.spaces.discrete import Discrete
 from gym.spaces.tuple import Tuple
 
-
+# standard libraries
+import contextlib
 with contextlib.redirect_stdout(None):
     # don't print annoying gfootball warning
     from kaggle_environments import make
 
+from . import export
 
 class Env:
 
@@ -185,6 +186,7 @@ class KaggleEnvWrapper():
         allowed = self.get_allowed_actions()
         return int(np.random.choice(allowed))
 
+@export
 class KaggleConnectX(KaggleEnvWrapper):
     """
     Info for rows=3, colums=3, inarow=3 random vs random policy leads to 54% winrate.
@@ -222,7 +224,7 @@ class KaggleConnectX(KaggleEnvWrapper):
         allowed = np.where(first_row == 0)[0]
         return allowed
 
-
+@export
 class KaggleTicTacToe(KaggleEnvWrapper):
     """
     This class is a wrapper class around kaggles TicTacToe environment.

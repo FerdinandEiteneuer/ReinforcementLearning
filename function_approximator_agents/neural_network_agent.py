@@ -1,3 +1,4 @@
+# external libraries
 import numpy as np
 from inspect import signature
 
@@ -10,6 +11,10 @@ def is_valid_policy_function(policy):
             return True
     return False
 
+# this package
+from . import export
+
+@export
 class NeuralNetworkAgent:
 
     def __init__(self, env, epsilon_scheduler, policy, gamma, self_play):

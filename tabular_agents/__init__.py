@@ -1,7 +1,8 @@
-from tabular_agents.tabular_agent import TabularAgent
+# base class
+from .tabular_agent import *
 
-# specific agents
-from tabular_agents.mc_every_visit_agent import MonteCarloEveryVisitAgent
-from tabular_agents.q_learning_agent import QLearningAgent
-from tabular_agents.sarsa_agent import SarsaAgent
-from tabular_agents.sarsa_lambda_agent import SarsaLambdaAgent
+# derived agents
+from .mc_every_visit_agent import *
+from .q_learning_agent import *
+from .sarsa_agent import *
+from .sarsa_lambda_agent import *

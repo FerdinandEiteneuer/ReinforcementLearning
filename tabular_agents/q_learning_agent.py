@@ -1,10 +1,11 @@
 import numpy as np
+
 import sys
 from inspect import signature
 
-
 from tabular_agents import TabularAgent
 
+__all__ = ['QLearningAgent']
 
 class QLearningAgent(TabularAgent):
     """

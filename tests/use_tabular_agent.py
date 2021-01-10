@@ -1,12 +1,12 @@
+# external libraries
+import gym
+import plotly
+import plotly.graph_objects as go
 import numpy as np
 np.set_printoptions(precision=3, suppress=True)
 
-from environments.kaggle_wrapper import KaggleTicTacToe, KaggleConnectX
-import gym
-
-import plotly
-import plotly.graph_objects as go
-
+# this package
+from environments import KaggleTicTacToe, KaggleConnectX
 import tabular_agents
 
 N0 = 5000

@@ -1,13 +1,16 @@
-from environments import KaggleTicTacToe, KaggleConnectX
-import numpy as np
-import random
-from function_approximator_agents.deep_qlearning_agent import DeepQLearningAgent
-from tests import connectx_3rows_3cols_3inarow_testcases
-
-import sys
+# external libraries
 import tensorflow as tf
-
+import numpy as np
 np.set_printoptions(precision=3)
+
+# standard library
+import random
+import sys
+
+# this package
+from environments import KaggleTicTacToe, KaggleConnectX
+from function_approximator_agents import DeepQLearningAgent
+from tests import connectx_3rows_3cols_3inarow_testcases
 
 print('\n------------\n')
 const_scheduler = lambda eps: lambda episodes: eps

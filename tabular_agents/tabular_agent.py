@@ -1,9 +1,14 @@
+# external libraries
 import numpy as np
 import gym
-from collections import deque
-import itertools
-from inspect import signature
 from tqdm import tqdm
+
+# standard library
+import itertools
+from collections import deque
+from inspect import signature
+
+__all__ = ['TabularAgent']
 
 class TabularAgent:
 
