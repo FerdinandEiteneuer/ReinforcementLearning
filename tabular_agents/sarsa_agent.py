@@ -1,5 +1,7 @@
+# this package
 from tabular_agents import TabularAgent
 
+__all__ = ['SarsaAgent']
 
 class SarsaAgent(TabularAgent):
 

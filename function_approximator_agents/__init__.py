@@ -1,13 +1,10 @@
-#print('in init function_approximator_agents')
-from function_approximator_agents.neural_network_agent import NeuralNetworkAgent
+__all__ = []
 
-#print('dir after first import:', dir())
+def export(defn):
+    globals()[defn.__name__] = defn
+    __all__.append(defn.__name__)
+    return defn
 
-from function_approximator_agents.deep_qlearning_agent import DeepQLearningAgent
-import function_approximator_agents.utils as utils
+from .deep_qlearning_agent import *
+from .neural_network_agent import *
 
-#print('dir after second import:', dir())
-#print('end init function_approximator_agents')
-
-#from function_approximator_agents.deep_qlearning_agent import DeepQLearningAgent
-#import function_approximator_agents.utils

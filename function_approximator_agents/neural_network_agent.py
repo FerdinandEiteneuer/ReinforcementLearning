@@ -1,7 +1,12 @@
+# external libraries
 import numpy as np
 import tensorflow
 import gym
 
+# this package
+from . import export
+
+@export
 class NeuralNetworkAgent:
 
     def __init__(self, env, epsilon_scheduler, policy, gamma, self_play):

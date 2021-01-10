@@ -1,15 +1,19 @@
 # external libraries
 import numpy as np
 import tensorflow as tf
+import gym
 from tqdm import tqdm
+
+# standard libraries
 import sys
 from collections import deque
-import gym
 
-from function_approximator_agents.neural_network_agent import NeuralNetworkAgent
-import function_approximator_agents.utils
+# this package
+from . import export
+from .neural_network_agent import NeuralNetworkAgent
+from .utils import create_Dense_net1
 
-
+@export
 class DeepQLearningAgent(NeuralNetworkAgent):
 
     def __init__(self,
@@ -37,7 +41,7 @@ class DeepQLearningAgent(NeuralNetworkAgent):
             self.Q_input_shape = (len(env.observation_space), )
             #self.Q_input_shape = (len(env.observation_space) + env.action_space.n, )
 
-        self.Q = function_approximator_agents.utils.create_Dense_net1(
+        self.Q = create_Dense_net1(
             input_shape=self.Q_input_shape,
             n_outputs=env.action_space.n,
             layers=1,
