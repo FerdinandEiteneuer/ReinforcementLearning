@@ -11,7 +11,7 @@ from collections import deque
 # this package
 from . import export
 from .neural_network_agent import NeuralNetworkAgent
-from .utils import create_Dense_net1
+from .utils import create_Sequential_Dense_net1
 
 @export
 class DeepQLearningAgent(NeuralNetworkAgent):
@@ -41,7 +41,7 @@ class DeepQLearningAgent(NeuralNetworkAgent):
             self.Q_input_shape = (len(env.observation_space), )
             #self.Q_input_shape = (len(env.observation_space) + env.action_space.n, )
 
-        self.Q = create_Dense_net1(
+        self.Q = create_Sequential_Dense_net1(
             input_shape=self.Q_input_shape,
             n_outputs=env.action_space.n,
             layers=1,
