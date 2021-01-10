@@ -144,7 +144,9 @@ class NeuralNetworkAgent:
         4. the action responding to this minimum (min-maxxed) will be the one the opponent actually takes
 
         """
-        #return self.get_random_action()
+
+        if np.random.uniform() < 0.5:
+            return self.get_random_action()
 
         # make a backup of environment state
         #env_original = self.env.env.state
@@ -168,7 +170,7 @@ class NeuralNetworkAgent:
             s_next, _, _, _ = self.env.execute_opponent_action(a)
 
             # next thing to improve: just put all s_next in one array and run predict only once
-            q_max, index_max = self.analyse_maxQ(s_next)
+            q_max, index_max = self.analyse_maxQ(s_next, 'Q')
 
             if q_max < min_max_Q:
                 min_max_Q = q_max
@@ -198,12 +200,11 @@ class NeuralNetworkAgent:
 
         index_max = 0
         q_max = - np.inf
-        for i, q in enumerate(qs):
 
-            if i not in allowed_actions:
-                continue  # only select legal actions
-            if q > q_max:
-                q_max = q
+        for i in allowed_actions:
+
+            if qs[i] > q_max:
+                q_max = qs[i]
                 index_max = i
 
         return q_max, index_max

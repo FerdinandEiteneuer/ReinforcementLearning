@@ -82,7 +82,7 @@ if __name__ == '__main__':
 
     #size_memory = 2*1024, len(env.observation_space) + env.action_space.n + 1
     size_memory = 4*512
-    update_period = 2*500
+    update_period = 2*512
 
     agent = DeepQLearningAgent(
         env=env,
@@ -93,7 +93,7 @@ if __name__ == '__main__':
         size_Q_memory=size_memory,
         fixed_target_weights=True,
         update_period_fixed_target_weights=update_period,
-        self_play=False,
+        self_play=True,
     )
 
     #for i in range(10): agent.play(5000, opponent_policy='random')

@@ -40,13 +40,13 @@ class DeepQLearningAgent(NeuralNetworkAgent):
         self.Q = function_approximator_agents.utils.create_Dense_net1(
             input_shape=self.Q_input_shape,
             n_outputs=env.action_space.n,
-            layers=2,
+            layers=1,
             neurons=512,
             p_dropout=0.1,
             lambda_regularization=10**(-4),
         )
 
-        self.starting_learning_rate = 0.000005
+        self.starting_learning_rate = 0.00001
 
         optimizer = tf.keras.optimizers.Adam(
             learning_rate=self.starting_learning_rate,
@@ -178,7 +178,7 @@ class DeepQLearningAgent(NeuralNetworkAgent):
 
             action = self.policy(state)
 
-            if self.self_play:
+            if self.self_play and self.episodes > self.size_Q_memory:
                 opponent_action = self.get_ideal_opponent_action
             else:
                 opponent_action = self.get_random_action
