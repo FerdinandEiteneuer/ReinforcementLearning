@@ -1,9 +1,12 @@
 # external libraries
 import numpy as np
-from inspect import signature
-
-import tensorflow
+import tensorflow as tf
 import gym
+
+# standard libraries
+from inspect import signature
+import os
+
 def is_valid_policy_function(policy):
     if callable(policy):
         sig = signature(policy)
@@ -13,11 +16,12 @@ def is_valid_policy_function(policy):
 
 # this package
 from . import export
+from utils import save_model_on_KeyboardInterrupt
 
 @export
 class NeuralNetworkAgent:
 
-    def __init__(self, env, epsilon_scheduler, policy, gamma, self_play):
+    def __init__(self, env, epsilon_scheduler, policy, gamma, self_play, save_model_path=None):
 
         self.env = env
         self.nb_actions = self.env.action_space.n
@@ -30,9 +34,12 @@ class NeuralNetworkAgent:
         self.default_policy = policy
         self.self_play = self_play
 
+        self.save_model_path = save_model_path
+
         # neural networks
         self.Q = None
         self.Q_fixed_weights = None
+        self.Q_memory = np.zeros((1, 1))
 
         self.policy = policy
 
@@ -74,6 +81,7 @@ class NeuralNetworkAgent:
         else:
             raise ValueError(f'Opponent policy was {policy}, but must be "greedy" or "random".')
 
+    @save_model_on_KeyboardInterrupt
     def train_and_play(self, train=8000, play=1000, repeat=1, funcs=[]):
         for i in range(repeat):
             print(f'\ntrain/play loop #{i+1}')
@@ -108,7 +116,6 @@ class NeuralNetworkAgent:
             return self.get_random_action()
         else:
             return self.get_greedy_action(state)
-
 
     def predict(self, state, network):
         """
@@ -219,7 +226,6 @@ class NeuralNetworkAgent:
         Picks the greedy action, given a state.
         """
         _, index_max = self.analyse_maxQ(state, 'Q')
-        #print('player choosing to get greedy action', state, index_max)
         return index_max
 
     def get_maxQ(self, state, network):
@@ -229,5 +235,42 @@ class NeuralNetworkAgent:
         q_max, _ = self.analyse_maxQ(state, network)
         return q_max
 
+    def save_model(self, network, path=None, overwrite=True, save_memory=True):
 
+        if path is None:
+            path = self.save_model_path
+        if path is None:
+            raise ValueError('no path given')
 
+        try:
+            model = getattr(self, network)
+        except AttributeError:
+            print(f'warning: could not find {network=}, using \'Q\' instead')
+            model = self.Q
+
+        self.save_model_path = path
+
+        model.save(path, overwrite=overwrite)
+        if save_memory:
+            self.save_memory(path)
+
+    def load_model(self, path, load_memory=True):
+
+        self.Q = tf.keras.models.load_model(path)
+        self.Q_fixed_weights = self.Q
+
+        if load_memory:
+            self.load_memory(path)
+
+    def save_memory(self, path):
+        npy_path = os.path.join(path, 'memory.npy')
+        np.save(file=npy_path, arr=self.Q_memory)
+
+    def load_memory(self, path):
+        npy_path = os.path.join(path, 'memory.npy')
+
+        try:
+            self.Q_memory = np.load(npy_path)
+        except FileNotFoundError as e:
+            print(f'Memory could net be loaded:', e)
+            raise

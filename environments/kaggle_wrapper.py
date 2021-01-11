@@ -215,6 +215,24 @@ class KaggleConnectX(KaggleEnvWrapper):
         self.columns = columns
         self.reward_range = (-1, 1)
 
+    def __str__(self):
+        baserepr = super().__str__()
+
+        replace = {
+            '|': ' ',
+            '+': ' ',
+            '-': ' ',
+            '0': '-',
+            '1': 'X',
+            '2': 'o',
+        }
+
+        for search, replacement in replace.items():
+            baserepr = baserepr.replace(search, replacement)
+
+        baserepr += '  ' + '   '.join(map(str, range(self.columns)))
+        return baserepr
+
     def get_allowed_actions(self, state=None):
 
         if state is None:

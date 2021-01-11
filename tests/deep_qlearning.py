@@ -15,12 +15,12 @@ from tests import connectx_3rows_3cols_3inarow_testcases
 print('\n------------\n')
 const_scheduler = lambda eps: lambda episodes: eps
 decay_scheduler1 = lambda episodes: 1/episodes
-bound_below_scheduler = lambda eps: lambda episodes: max(eps, 7000/(7000+episodes))
+bound_below_scheduler = lambda eps: lambda episodes: max(eps, 9000/(9000+episodes))
 
 
-def predict_starting_position(agent, mode='connectx'):
+def predict_starting_position(agent, mode='tictactoe'):
     if mode == 'tictactoe':
-        print(agent.predict(9*[0]).reshape((3, 3)))
+        print(agent.predict_Q(np.zeros(9,)).reshape((3, 3)))
     elif mode == 'connectx':
         print(agent.predict(9*[0]).reshape(agent.env.action_space.n))
 
@@ -73,8 +73,11 @@ if __name__ == '__main__':
 
     #set_random_seeds(123)
 
-    env = KaggleTicTacToe()
-    #env = KaggleConnectX(rows=6, columns=7, inarow=4)
+    tictactoe = KaggleTicTacToe()
+    connect4 = KaggleConnectX(rows=6, columns=7, inarow=4)
+
+
+    env = connect4
 
     #time_(env, 10000)
 
@@ -90,14 +93,17 @@ if __name__ == '__main__':
     agent = DeepQLearningAgent(
         env=env,
         gamma=1,
-        epsilon_scheduler=bound_below_scheduler(0.15),
+        epsilon_scheduler=bound_below_scheduler(0.2),
         #epsilon_scheduler=const_scheduler(0.15),
         experience_replay=True,
         size_Q_memory=size_memory,
         fixed_target_weights=True,
         update_period_fixed_target_weights=update_period,
         self_play=True,
+        save_model_path='/home/ferdinand/rl/reinforcement_learning/data/latest_network',
     )
+
+    agent.load_model(agent.save_model_path)
 
     #for i in range(10): agent.play(5000, opponent_policy='random')
     #sys.exit()
@@ -116,5 +122,5 @@ if __name__ == '__main__':
                          )
 
 
-    print(agent.Q.weights[0][0][:35])
+    agent.save_model('Q', agent.save_model_path, overwrite=True)
 

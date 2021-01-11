@@ -5,19 +5,20 @@ import gym
 from tqdm import tqdm
 
 # standard libraries
-import sys
 from collections import deque
 
 # this package
 from . import export
 from .neural_network_agent import NeuralNetworkAgent
-from .utils import create_Sequential_Dense_net1
+from utils import create_Sequential_Dense_net1, save_model_on_KeyboardInterrupt
+
 
 @export
 class DeepQLearningAgent(NeuralNetworkAgent):
 
     def __init__(self,
                  env,
+                 save_model_path=None,
                  batch_size=16,
                  epsilon_scheduler=lambda episodes: 0.1,
                  policy='eps_greedy',
@@ -32,7 +33,8 @@ class DeepQLearningAgent(NeuralNetworkAgent):
                          policy=policy,
                          epsilon_scheduler=epsilon_scheduler,
                          gamma=gamma,
-                         self_play=self_play)
+                         self_play=self_play,
+                         save_model_path=save_model_path)
 
         if type(env.observation_space) is gym.spaces.discrete.Discrete:
             #self.Q_input_shape = (env.observation_space.n + env.action_space.n, )
@@ -44,20 +46,20 @@ class DeepQLearningAgent(NeuralNetworkAgent):
         self.Q = create_Sequential_Dense_net1(
             input_shape=self.Q_input_shape,
             n_outputs=env.action_space.n,
-            layers=1,
+            layers=2,
             neurons=512,
             p_dropout=0.1,
             lambda_regularization=10**(-4),
         )
 
-        self.starting_learning_rate = 0.00001
+        self.starting_learning_rate = 10**(-5)
 
         optimizer = tf.keras.optimizers.Adam(
             learning_rate=self.starting_learning_rate,
             beta_1=0.9,
             beta_2=0.999,
             epsilon=1e-07,
-            amsgrad=False
+            amsgrad=True
         )
 
         #self.loss = 'mean_absolute_error'
@@ -115,7 +117,6 @@ class DeepQLearningAgent(NeuralNetworkAgent):
         targets = self.Q_memory[:, -self.nb_actions:]
 
         return states, targets
-
 
     def update_Q(self, batch_size=128, episodes=2):
 
@@ -209,7 +210,6 @@ class DeepQLearningAgent(NeuralNetworkAgent):
 
         return train_info
 
-
     def play_one_episode(self):
         """
         The agent plays one episode.
@@ -233,7 +233,6 @@ class DeepQLearningAgent(NeuralNetworkAgent):
         info['last_reward'] = reward
         info['episode_memory'] = episode_memory
         return info
-
 
     def _loop(self, n_episodes, train=True):
         """
@@ -318,9 +317,6 @@ class DeepQLearningAgent(NeuralNetworkAgent):
 
         self.policy = 'greedy'
         self.opponent_policy = opponent_policy
-        
-        #self.policy = 'random'
-        #self.opponent_policy = 'greedy'
         
         return self._loop(n_episodes, train=False)
 
