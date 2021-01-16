@@ -9,7 +9,8 @@ with contextlib.redirect_stdout(None):
     # don't print annoying gfootball warning
     from kaggle_environments import make
 
-from . import export
+# this package
+from utils import export
 
 class Env:
 

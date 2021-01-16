@@ -5,18 +5,15 @@ np.set_printoptions(precision=3)
 
 # standard library
 import random
-import sys
+import os
 
 # this package
+from utils import ConstEpsilonScheduler, DecayingEpsilonScheduler
 from environments import KaggleTicTacToe, KaggleConnectX
 from function_approximator_agents import DeepQLearningAgent
 from tests import connectx_3rows_3cols_3inarow_testcases
 
 print('\n------------\n')
-const_scheduler = lambda eps: lambda episodes: eps
-decay_scheduler1 = lambda episodes: 1/episodes
-bound_below_scheduler = lambda eps: lambda episodes: max(eps, 9000/(9000+episodes))
-
 
 def predict_starting_position(agent, mode='tictactoe'):
     if mode == 'tictactoe':
@@ -37,25 +34,6 @@ def pred(model, mode='connectx'):
         print('using', vals)
         print(model(vals).numpy())
 
-def time_(env, N):
-    import time
-
-    t_start=time.time()
-    for i in range(N):
-        e1 = env.env.clone()
-
-    duration = time.time() - t_start
-    print(f'cloning env via clone function took {duration} s. {duration/N}')
-
-    from copy import copy, deepcopy
-    t_start = time.time()
-    for i in range(N):
-        e2 = deepcopy(env)
-
-    duration = time.time()- t_start
-    print(f'cloning env via clone function took {duration} s. {duration/N}')
-    sys.exit()
-
 def time2_(agent):
     state = np.zeros(25)
     agent.predict(state)
@@ -75,36 +53,36 @@ if __name__ == '__main__':
 
     tictactoe = KaggleTicTacToe()
     connect4 = KaggleConnectX(rows=6, columns=7, inarow=4)
+    connect3 = KaggleConnectX(rows=4, columns=4, inarow=3)
 
 
-    env = connect4
-
-    #time_(env, 10000)
+    env = connect3
 
     starting_position = np.zeros((1, 9))
 
-    # one memory point would be [state, action(one_hot), target]
-    # the last one is the target r + max_a' Q(s',a', fixed_weights)
-
-    #size_memory = 2*1024, len(env.observation_space) + env.action_space.n + 1
     size_memory = 4*512
     update_period = 2*512
+
+    eps_scheduler = DecayingEpsilonScheduler(eps=1, decay_scale=10000)
+    data_path = os.path.join(os.environ['HOME'], 'rl', 'reinforcement_learning', 'data')
+    model_path = data_path + os.path.join(data_path, 'latest_network2')
 
     agent = DeepQLearningAgent(
         env=env,
         gamma=1,
-        epsilon_scheduler=bound_below_scheduler(0.2),
-        #epsilon_scheduler=const_scheduler(0.15),
+        epsilon_scheduler=eps_scheduler,
         experience_replay=True,
         size_Q_memory=size_memory,
         fixed_target_weights=True,
         update_period_fixed_target_weights=update_period,
         self_play=True,
-        save_model_path='/home/ferdinand/rl/reinforcement_learning/data/latest_network',
+        save_model_path=model_path,
     )
 
-    agent.load_model(agent.save_model_path)
-
+    try:
+        agent.load_model(agent.save_model_path, load_memory=True)
+    except Exception as e:
+        print('-COULD NOT LOAD AGENT-')
     #for i in range(10): agent.play(5000, opponent_policy='random')
     #sys.exit()
 
@@ -122,5 +100,5 @@ if __name__ == '__main__':
                          )
 
 
-    agent.save_model('Q', agent.save_model_path, overwrite=True)
+    agent.save_model('Q', agent.save_model_path, overwrite=True, save_memory=True)
 

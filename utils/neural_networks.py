@@ -1,13 +1,12 @@
 """
 utilities for the neural network agent
 """
-
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout
 from tensorflow.keras.regularizers import l2
 from tensorflow.keras.initializers import GlorotNormal
 
-from . import export
+from utils import export
 
 
 @export

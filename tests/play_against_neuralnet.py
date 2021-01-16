@@ -1,3 +1,8 @@
+# standard libraries
+import sys
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+
 # external libraries
 import numpy as np
 from tensorflow.keras.models import load_model
@@ -5,7 +10,6 @@ from tensorflow.keras.models import load_model
 # this package
 from environments import KaggleTicTacToe, KaggleConnectX
 from function_approximator_agents import DeepQLearningAgent
-from utils import LATEST_NETWORK_PATH
 
 REWARD_MSG = {
     0: 'Its a draw!',
@@ -14,15 +18,19 @@ REWARD_MSG = {
 }
 
 def get_player_action(valid_actions):
-
+    action = None
     while True:
 
         try:
             action = int(input(f'Choose a wise action from ({list(valid_actions)}): '))
-            if action in valid_actions:
-                return action
         except Exception as e:
             continue
+
+        if action in valid_actions:
+            return action
+
+        if action == 'q' or action == 'x':
+            sys.exit('bye bye')
 
 
 def play_one_round(agent):
@@ -62,23 +70,27 @@ def play_one_round(agent):
 def main():
 
 
-    game = 'connect4'
+    game = 'connect3'
 
     if game == 'tictaotoe':
         env = KaggleTicTacToe()
-        model = load_model('/home/ferdinand/rl/reinforcement_learning/data/tictactoe_network')
+        model_path = '/home/ferdinand/rl/reinforcement_learning/data/tictactoe_network'
     elif game == 'connect4':
-        print('trying to load', LATEST_NETWORK_PATH)
         env = KaggleConnectX(rows=6, columns=7, inarow=4)
-        model = load_model(LATEST_NETWORK_PATH)
+        model_path = '/data/latest_network'
+    elif game == 'connect3':
+        env = KaggleConnectX(rows=4, columns=4, inarow=3)
+        model_path = '/data/latest_network'
+
 
 
     agent = DeepQLearningAgent(
         env=env,
-        policy='greedy'
+        policy='greedy',
+        save_model_path=model_path,
     )
 
-    agent.Q = model
+    agent.load_model(model_path, load_memory=False)
 
     while True:
         print('\nstarting round ...')
@@ -86,5 +98,8 @@ def main():
 
 
 if __name__ == '__main__':
+
+
+
     main()
 

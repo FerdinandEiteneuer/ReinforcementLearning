@@ -46,13 +46,13 @@ class DeepQLearningAgent(NeuralNetworkAgent):
         self.Q = create_Sequential_Dense_net1(
             input_shape=self.Q_input_shape,
             n_outputs=env.action_space.n,
-            layers=2,
-            neurons=512,
+            layers=7,
+            neurons=128,
             p_dropout=0.1,
             lambda_regularization=10**(-4),
         )
 
-        self.starting_learning_rate = 10**(-5)
+        self.starting_learning_rate = 2*10**(-5)
 
         optimizer = tf.keras.optimizers.Adam(
             learning_rate=self.starting_learning_rate,
@@ -63,7 +63,8 @@ class DeepQLearningAgent(NeuralNetworkAgent):
         )
 
         #self.loss = 'mean_absolute_error'
-        self.loss = 'mean_squared_error'
+        #self.loss = 'mean_squared_error'
+        self.loss = tf.keras.losses.Huber()
 
         self.Q.compile(
             optimizer=optimizer,
@@ -120,7 +121,8 @@ class DeepQLearningAgent(NeuralNetworkAgent):
 
     def update_Q(self, batch_size=128, episodes=2):
 
-        if self.episodes > self.size_Q_memory:
+        if self.memory_ready():
+        #if self.episodes > self.size_Q_memory:
 
             #state_action_inputs, rewards = self.training_data()
             states, targets = self.training_data()
@@ -174,10 +176,12 @@ class DeepQLearningAgent(NeuralNetworkAgent):
 
         # train the neural network
         if self.episodes % 20 == 0:
-            fit_info = self.update_Q(episodes=3)
+            fit_info = self.update_Q(episodes=10)
             if fit_info:
                 history = fit_info.history
                 losses.extend(history['loss'])
+                if losses[-1] == 0:
+                    print('loss was zero. ', fit_info)
 
         while not terminal:
 

@@ -15,7 +15,7 @@ def is_valid_policy_function(policy):
     return False
 
 # this package
-from . import export
+from utils import export
 from utils import save_model_on_KeyboardInterrupt
 
 @export
@@ -157,7 +157,7 @@ class NeuralNetworkAgent:
 
         """
 
-        if np.random.uniform() < 0.5:
+        if np.random.uniform() < 0.1:
             return self.get_random_action()
 
         # make a backup of environment state
@@ -236,11 +236,12 @@ class NeuralNetworkAgent:
         return q_max
 
     def save_model(self, network, path=None, overwrite=True, save_memory=True):
-
         if path is None:
             path = self.save_model_path
         if path is None:
             raise ValueError('no path given')
+
+        print('saving model to:', path)
 
         try:
             model = getattr(self, network)
@@ -273,4 +274,12 @@ class NeuralNetworkAgent:
             self.Q_memory = np.load(npy_path)
         except FileNotFoundError as e:
             print(f'Memory could net be loaded:', e)
-            raise
+
+    def memory_ready(self):
+        assert self.Q_memory is not None
+        nonzero = np.sum(self.Q_memory[:,-1] != 0)
+        if np.any(self.Q_memory[-1] != 0):
+        #if self.Q_memory.shape[0] - nonzero < 10:
+            return True
+        else:
+            return False

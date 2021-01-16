@@ -1,7 +1,9 @@
+# external libraries
 import numpy as np
 import gym
 
-from . import export
+# this package
+from utils import export
 
 grid1 = {
 
