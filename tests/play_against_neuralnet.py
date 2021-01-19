@@ -71,15 +71,17 @@ def play_one_round(agent):
 def main():
     game = 'connect3'
 
+    datapath = os.path.join(os.environ['HOME'], 'rl', 'reinforcement_learning', 'data')
+
     if game == 'tictaotoe':
         env = KaggleTicTacToe()
-        model_path = '/home/ferdinand/rl/reinforcement_learning/data/tictactoe_network'
+        model_path = os.path.join(datapath, 'tictactoe_network')
     elif game == 'connect4':
         env = KaggleConnectX(rows=6, columns=7, inarow=4)
-        model_path = '/data/latest_network'
+        model_path = os.path.join(datapath, 'connect4net')
     elif game == 'connect3':
         env = KaggleConnectX(rows=4, columns=4, inarow=3)
-        model_path = '/data/latest_network'
+        model_path = os.path.join(datapath, 'connect3net')
 
     agent = DeepQLearningAgent(
         env=env,

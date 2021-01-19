@@ -47,12 +47,12 @@ class DeepQLearningAgent(NeuralNetworkAgent):
             input_shape=self.Q_input_shape,
             n_outputs=env.action_space.n,
             layers=7,
-            neurons=128,
+            neurons=256,
             p_dropout=0.1,
             lambda_regularization=10**(-4),
         )
 
-        self.starting_learning_rate = 5*10**(-5)
+        self.starting_learning_rate = 1*10**(-6)
 
         optimizer = tf.keras.optimizers.Adam(
             learning_rate=self.starting_learning_rate,

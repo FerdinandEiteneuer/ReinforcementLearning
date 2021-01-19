@@ -12,6 +12,19 @@ with contextlib.redirect_stdout(None):
 # this package
 from utils import export
 
+
+class bcolors:
+    """
+    used for pretty printing the gameboard in colors.
+    """
+    BLUE = '\033[94m'
+    CYAN = '\033[96m'
+    GREEN = '\033[92m'
+    ORANGE = '\033[93m'
+    RED = '\033[91m'
+    ENDC = '\033[0m'
+
+
 class Env:
 
     def __init__(self):
@@ -224,8 +237,8 @@ class KaggleConnectX(KaggleEnvWrapper):
             '+': ' ',
             '-': ' ',
             '0': '-',
-            '1': 'X',
-            '2': 'o',
+            '1': bcolors.RED + 'X' + bcolors.ENDC,
+            '2': bcolors.GREEN + 'o' + bcolors.ENDC,
         }
 
         for search, replacement in replace.items():
