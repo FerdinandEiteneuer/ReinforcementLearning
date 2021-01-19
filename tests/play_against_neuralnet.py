@@ -1,6 +1,7 @@
 # standard libraries
 import sys
 import os
+
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 # external libraries
@@ -17,24 +18,25 @@ REWARD_MSG = {
     1: 'You lost!'
 }
 
+
 def get_player_action(valid_actions):
-    action = None
+
     while True:
 
-        try:
-            action = int(input(f'Choose a wise action from ({list(valid_actions)}): '))
-        except Exception as e:
-            continue
-
-        if action in valid_actions:
-            return action
+        action = input(f'Choose a wise action from ({list(valid_actions)}): ')
 
         if action == 'q' or action == 'x':
             sys.exit('bye bye')
 
+        try:
+            action = int(action)
+            if action in valid_actions:
+                return action
+        except ValueError:
+            pass  # just try again...
+
 
 def play_one_round(agent):
-
     env = agent.env
 
     state = env.reset()
@@ -56,7 +58,6 @@ def play_one_round(agent):
         valid_actions = env.get_allowed_actions(state)
         player_action = get_player_action(valid_actions)
 
-
         state, reward, terminal, info = env.execute_opponent_action(player_action)
 
         print(f'after player step')
@@ -68,8 +69,6 @@ def play_one_round(agent):
 
 
 def main():
-
-
     game = 'connect3'
 
     if game == 'tictaotoe':
@@ -81,8 +80,6 @@ def main():
     elif game == 'connect3':
         env = KaggleConnectX(rows=4, columns=4, inarow=3)
         model_path = '/data/latest_network'
-
-
 
     agent = DeepQLearningAgent(
         env=env,
@@ -98,8 +95,4 @@ def main():
 
 
 if __name__ == '__main__':
-
-
-
     main()
-
