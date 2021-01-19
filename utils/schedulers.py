@@ -1,10 +1,13 @@
 """
 epsilon (exploration rate) schedulers.
+TODO: make base scheduler class for all decayables, like learning rates?
 """
 
+# external libraries
 import numpy as np
-from utils import export
 
+# this package
+from utils import export
 
 @export
 class EpsilonScheduler:
@@ -48,14 +51,13 @@ class DecayingEpsilonScheduler(EpsilonScheduler):
         """
         super().__init__(eps=eps, episodes=episodes, minimum=minimum)
 
-        #self.N0 = N0
         self.decay_scale = decay_scale
         self.decay_factor = 1/np.e**(1/decay_scale)
         self.eps_0 = eps
 
     def __call__(self, episodes=None):
         #self.episodes = episodes
-        self.eps = self.eps * self.decay_factor
+        self.eps *= self.decay_factor
         return self.eps
 
 
@@ -78,5 +80,5 @@ if __name__ == '__main__':
     ds = DecayingEpsilonScheduler(starting_eps, decay_scale=10, minimum=0.1)
 
     print(starting_eps/np.e)
-    for i in range(1, 20):
+    for i in range(1, 40):
         print(f'{i=}, {ds()}')

@@ -4,19 +4,13 @@ import tensorflow as tf
 import gym
 
 # standard libraries
-from inspect import signature
 import os
 
-def is_valid_policy_function(policy):
-    if callable(policy):
-        sig = signature(policy)
-        if len(sig.parameters) == 1:  # this policy must take 1 parameter (state)
-            return True
-    return False
-
 # this package
-from utils import export
-from utils import save_model_on_KeyboardInterrupt
+from utils import (export,
+                   save_model_on_KeyboardInterrupt,
+                   is_valid_policy_function)
+
 
 @export
 class NeuralNetworkAgent:

@@ -63,9 +63,9 @@ if __name__ == '__main__':
     size_memory = 4*512
     update_period = 2*512
 
-    eps_scheduler = DecayingEpsilonScheduler(eps=1, decay_scale=10000)
     data_path = os.path.join(os.environ['HOME'], 'rl', 'reinforcement_learning', 'data')
     model_path = data_path + os.path.join(data_path, 'latest_network2')
+    eps_scheduler = DecayingEpsilonScheduler(eps=1, decay_scale=20000, minimum=0.1)
 
     agent = DeepQLearningAgent(
         env=env,

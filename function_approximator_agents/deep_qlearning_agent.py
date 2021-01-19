@@ -52,7 +52,7 @@ class DeepQLearningAgent(NeuralNetworkAgent):
             lambda_regularization=10**(-4),
         )
 
-        self.starting_learning_rate = 2*10**(-5)
+        self.starting_learning_rate = 5*10**(-5)
 
         optimizer = tf.keras.optimizers.Adam(
             learning_rate=self.starting_learning_rate,
