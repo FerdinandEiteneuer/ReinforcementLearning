@@ -9,6 +9,14 @@ import numpy as np
 # this package
 from utils import export
 
+
+@export
+def decaying_learning_rate_scheduler(decay_factor=0.99, minimum=10**(-7)):
+    def lr_scheduler(epoch, lr):
+        return max(minimum, lr * decay_factor)
+    return lr_scheduler
+
+
 @export
 class EpsilonScheduler:
 
@@ -44,7 +52,6 @@ class EpsilonScheduler:
 
 @export
 class DecayingEpsilonScheduler(EpsilonScheduler):
-
     def __init__(self, eps, decay_scale=10000, episodes=0, minimum=0):
         """
         After decay_scale episodes, the initial value of eps has dropped to 1/e
@@ -62,7 +69,7 @@ class DecayingEpsilonScheduler(EpsilonScheduler):
 
 
 @export
-class LinearlyDecreasingScheduler(EpsilonScheduler):
+class LinearlyDecreasingEpsilonScheduler(EpsilonScheduler):
     def __init__(self, eps, end_of_decrease=40000, episodes=0, minimum=0):
         super().__init__(eps=eps, episodes=episodes, minimum=minimum)
 
@@ -93,7 +100,7 @@ if __name__ == '__main__':
     print('\nTESTING LINEAR DECREASE SCHEDULER')
 
     n = 10
-    ls = LinearlyDecreasingScheduler(1, end_of_decrease=n, episodes=0, minimum=+0.5)
+    ls = LinearlyDecreasingEpsilonScheduler(1, end_of_decrease=n, episodes=0, minimum=+0.5)
     for i in range(n+3):
         print(i, ls())
 

@@ -1,27 +1,36 @@
 # external libraries
 import numpy as np
 import tensorflow as tf
-import gym
 
 # standard libraries
 import os
+import contextlib
 
 # this package
 from utils import (export,
                    save_model_on_KeyboardInterrupt,
-                   is_valid_policy_function)
+                   is_valid_policy_function,
+                   decaying_learning_rate_scheduler)
 
 
 @export
 class NeuralNetworkAgent:
 
-    def __init__(self, env, epsilon_scheduler, policy, gamma, self_play, save_model_path=None):
+    def __init__(self, env,
+                 epsilon_scheduler,
+                 learning_rate_scheduler,
+                 policy,
+                 gamma,
+                 self_play,
+                 save_model_path=None):
 
         self.env = env
         self.nb_actions = self.env.action_space.n
         self.env.dtype_state = np.ndarray
 
         self.epsilon_scheduler = epsilon_scheduler
+        self.learning_rate_scheduler = learning_rate_scheduler
+
         self.eps = None
         self.gamma = gamma
 
@@ -29,6 +38,8 @@ class NeuralNetworkAgent:
         self.self_play = self_play
 
         self.save_model_path = save_model_path
+        self.autosave = True
+
 
         # neural networks
         self.Q = None
@@ -235,7 +246,6 @@ class NeuralNetworkAgent:
         if path is None:
             raise ValueError('no path given')
 
-        print('saving model to:', path)
 
         try:
             model = getattr(self, network)
@@ -245,7 +255,10 @@ class NeuralNetworkAgent:
 
         self.save_model_path = path
 
-        model.save(path, overwrite=overwrite)
+        print('saving model to:', path)
+        with contextlib.redirect_stderr(None):  # do not clutter output
+            model.save(path, overwrite=overwrite)
+
         if save_memory:
             self.save_memory(path)
 
@@ -271,9 +284,4 @@ class NeuralNetworkAgent:
 
     def memory_ready(self):
         assert self.Q_memory is not None
-        nonzero = np.sum(self.Q_memory[:,-1] != 0)
-        if np.any(self.Q_memory[-1] != 0):
-        #if self.Q_memory.shape[0] - nonzero < 10:
-            return True
-        else:
-            return False
+        return np.any(self.Q_memory[-1] != 0)

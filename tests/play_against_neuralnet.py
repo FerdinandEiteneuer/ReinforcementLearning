@@ -6,7 +6,6 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 # external libraries
 import numpy as np
-from tensorflow.keras.models import load_model
 
 # this package
 from environments import KaggleTicTacToe, KaggleConnectX
@@ -23,10 +22,13 @@ def get_player_action(valid_actions):
 
     while True:
 
-        action = input(f'Choose a wise action from ({list(valid_actions)}): ')
+        try:
+            action = input(f'Choose a wise action from ({list(valid_actions)}): ')
+        except EOFError:
+            exit()
 
         if action == 'q' or action == 'x':
-            sys.exit('bye bye')
+            exit()
 
         try:
             action = int(action)
@@ -69,7 +71,7 @@ def play_one_round(agent):
 
 
 def main():
-    game = 'connect3'
+    game = 'connect4'
 
     datapath = os.path.join(os.environ['HOME'], 'rl', 'reinforcement_learning', 'data')
 

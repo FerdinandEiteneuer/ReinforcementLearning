@@ -8,7 +8,7 @@ import random
 import os
 
 # this package
-from utils import ConstEpsilonScheduler, DecayingEpsilonScheduler, LinearlyDecreasingScheduler
+import utils
 from environments import KaggleTicTacToe, KaggleConnectX
 from function_approximator_agents import DeepQLearningAgent
 from tests import connectx_3rows_3cols_3inarow_testcases
@@ -56,24 +56,31 @@ if __name__ == '__main__':
     connect3 = KaggleConnectX(rows=4, columns=4, inarow=3)
 
 
-    env = connect3
+    env = connect4
 
     starting_position = np.zeros((1, 9))
 
-    size_memory = 4*512
-    update_period = 2*512
+    size_memory = 8*512
+    update_period = 3*512
 
     data_path = os.path.join(os.environ['HOME'], 'rl', 'reinforcement_learning', 'data')
 
-    model_path = os.path.join(data_path, 'connect3net')
+    model_path = os.path.join(data_path, 'connect4net')
 
     #decaying_eps_scheduler = DecayingEpsilonScheduler(eps=1, decay_scale=30000, minimum=0.2)
-    linear_decrease = LinearlyDecreasingScheduler(eps=1, end_of_decrease=40000, minimum=0.2)
+    linear_decrease = utils.LinearlyDecreasingEpsilonScheduler(eps=1,
+                                                               end_of_decrease=600_000,
+                                                               minimum=0.3)
+
+    lr_scheduler = utils.decaying_learning_rate_scheduler(decay_factor=0.96,
+                                                          minimum=10**(-7))
+
 
     agent = DeepQLearningAgent(
         env=env,
         gamma=0.99,
         epsilon_scheduler=linear_decrease,
+        learning_rate_scheduler=lr_scheduler,
         experience_replay=True,
         size_Q_memory=size_memory,
         fixed_target_weights=True,

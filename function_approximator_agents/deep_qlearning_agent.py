@@ -6,12 +6,14 @@ from tqdm import tqdm
 
 # standard libraries
 from collections import deque
+import contextlib
 
 # this package
 from . import export
 from .neural_network_agent import NeuralNetworkAgent
-from utils import create_Sequential_Dense_net1, save_model_on_KeyboardInterrupt
-
+from utils import create_Sequential_Dense_net1
+from utils import save_model_on_KeyboardInterrupt
+from utils import ConstEpsilonScheduler
 
 @export
 class DeepQLearningAgent(NeuralNetworkAgent):
@@ -20,7 +22,8 @@ class DeepQLearningAgent(NeuralNetworkAgent):
                  env,
                  save_model_path=None,
                  batch_size=16,
-                 epsilon_scheduler=lambda episodes: 0.1,
+                 epsilon_scheduler=ConstEpsilonScheduler(0.1),
+                 learning_rate_scheduler=None,
                  policy='eps_greedy',
                  experience_replay=True,
                  size_Q_memory=1024,
@@ -32,6 +35,7 @@ class DeepQLearningAgent(NeuralNetworkAgent):
         super().__init__(env=env,
                          policy=policy,
                          epsilon_scheduler=epsilon_scheduler,
+                         learning_rate_scheduler=learning_rate_scheduler,
                          gamma=gamma,
                          self_play=self_play,
                          save_model_path=save_model_path)
@@ -52,7 +56,7 @@ class DeepQLearningAgent(NeuralNetworkAgent):
             lambda_regularization=10**(-4),
         )
 
-        self.starting_learning_rate = 1*10**(-6)
+        self.starting_learning_rate = 1*10**(-5)
 
         optimizer = tf.keras.optimizers.Adam(
             learning_rate=self.starting_learning_rate,
@@ -65,6 +69,11 @@ class DeepQLearningAgent(NeuralNetworkAgent):
         #self.loss = 'mean_absolute_error'
         #self.loss = 'mean_squared_error'
         self.loss = tf.keras.losses.Huber()
+
+        self.callbacks = []
+        if self.learning_rate_scheduler:
+            scheduler = tf.keras.callbacks.LearningRateScheduler(self.learning_rate_scheduler)
+            self.callbacks.append(scheduler)
 
         self.Q.compile(
             optimizer=optimizer,
@@ -80,11 +89,10 @@ class DeepQLearningAgent(NeuralNetworkAgent):
         # reserve space for the experienced episodes, if desired
         if experience_replay:
             self.size_Q_memory = size_Q_memory
-            #memorypoint = [state, action, target]
             self.Q_memory = np.zeros((size_Q_memory, self.Q_input_shape[0] + self.nb_actions))
 
         # here, we build a second network that will generate the predictions
-        # to greate the Q learning target. This is done to create more stability.
+        # to create the Q learning target. This is done to create more stability.
         if fixed_target_weights:
             # the attribute 'Q_fixed_weights' shall be reserved for the second network
             self.Q_fixed_weights = tf.keras.models.clone_model(self.Q)
@@ -98,21 +106,15 @@ class DeepQLearningAgent(NeuralNetworkAgent):
         batch_size = max(1, min(self.batch_size, self.e))
 
         if self.episodes > self.size_Q_memory:  # memory is filled
-
             indices = np.random.choice(range(self.size_Q_memory), self.batch_size)
             x_train = self.Q_memory[:, :-1][indices]
             y_train = self.Q_memory[:, -1][indices]
             return x_train, y_train, True
 
         else:  # memory is too small
-
             return None, None, False
 
     def training_data(self):
-        #state_action_inputs = self.Q_memory[:, :-1]
-        #rewards = self.Q_memory[:, -1]
-        #return state_action_inputs, rewards
-
         # one Q_memory row consists of [state, Qvalues(dim=nb_actions)]
         states = self.Q_memory[:, :-self.nb_actions]
         targets = self.Q_memory[:, -self.nb_actions:]
@@ -122,18 +124,15 @@ class DeepQLearningAgent(NeuralNetworkAgent):
     def update_Q(self, batch_size=128, episodes=2):
 
         if self.memory_ready():
-        #if self.episodes > self.size_Q_memory:
 
-            #state_action_inputs, rewards = self.training_data()
             states, targets = self.training_data()
 
             fit_result = self.Q.fit(
-                #x=state_action_inputs,
-                #y=rewards,
                 x=states,
                 y=targets,
                 batch_size=batch_size,
                 epochs=episodes,
+                callbacks=self.callbacks,
                 verbose=False)
 
             return fit_result
@@ -302,6 +301,10 @@ class DeepQLearningAgent(NeuralNetworkAgent):
             win_percentage = 'n/a'
 
         print(f'did {n_episodes=}, {train=}, {total_reward=} (including negative rewards), win %: {win_percentage:.2f}')
+
+        if self.autosave:
+            self.save_model('Q', path=self.save_model_path)
+
         return total_reward
 
     def train(self, n_episodes):
@@ -314,8 +317,8 @@ class DeepQLearningAgent(NeuralNetworkAgent):
             self.opponent_policy = 'greedy'
         else:
             self.opponent_policy = 'random'
-            
-        return self._loop(n_episodes, train=True)
+
+        self._loop(n_episodes, train=True)
 
     def play(self, n_episodes, opponent_policy='random'):
 
