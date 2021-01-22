@@ -69,7 +69,7 @@ if __name__ == '__main__':
 
     linear_decrease = utils.LinearlyDecreasingEpsilonScheduler(
         eps=1,
-        end_of_decrease=600_000,
+        end_of_decrease=100_000,
         minimum=0.3
     )
 

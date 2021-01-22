@@ -259,25 +259,24 @@ class DeepQLearningAgent(NeuralNetworkAgent):
 
                 postfix = ''
 
-                reward = info['last_reward']
-                rewards_.append(reward)
-                total_reward += reward
+                if reward := info.get('last_reward'):
+                    rewards_.append(reward)
+                    total_reward += reward
 
-                try:
-                    if reward == self.env.reward_range[-1]:  # e.g reward_range = (-1, 1), where 1 is the win
-                        wins += 1
-                    postfix += f'wins={100*wins/(k+1):.2f}%, '
-                except AttributeError:
-                    wins = 'n/a'
+                    try:
+                        if reward == self.env.reward_range[-1]:  # e.g reward_range = (-1, 1), where 1 is the win
+                            wins += 1
+                        postfix += f'wins={100*wins/(k+1):.2f}%, '
+                    except AttributeError:
+                        wins = 'n/a'
 
-                ema_reward = beta * ema_reward + (1 - beta) * reward
-                postfix += f'reward:{ema_reward/(1-beta**(k+1)):.2f}, '
+                    ema_reward = beta * ema_reward + (1 - beta) * reward
+                    postfix += f'reward:{ema_reward/(1-beta**(k+1)):.2f}, '
 
-                if 'mean_loss' in info and info['mean_loss']:
-                    mean_loss = info['mean_loss']
+                if mean_loss := info.get('mean_loss'):
                     ema_mean_loss = beta_mean_loss * ema_mean_loss + (1 - beta_mean_loss) * mean_loss
                     #postfix += f'mean loss={ema_mean_loss/(1-beta)**(k+1):.2f}, '
-                postfix += f'mean loss={mean_loss:.3f} '
+                    postfix += f'mean loss={mean_loss:.3f} '
 
                 if self.eps != None:
                     postfix += f'eps={self.eps:.2e} '
@@ -286,9 +285,6 @@ class DeepQLearningAgent(NeuralNetworkAgent):
 
                 t.postfix = postfix
                 t.update()
-
-                #if k % 500 == 0:
-                #    print(self.predict(9*[0]).reshape((3,3)), f'{k=}')
 
         try:
             win_percentage = wins / n_episodes * 100
