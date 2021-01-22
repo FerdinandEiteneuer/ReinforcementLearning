@@ -11,22 +11,20 @@ import contextlib
 # this package
 from . import export
 from .neural_network_agent import NeuralNetworkAgent
-from utils import create_Sequential_Dense_net1
-from utils import save_model_on_KeyboardInterrupt
-from utils import ConstEpsilonScheduler
+import utils
 
 @export
 class DeepQLearningAgent(NeuralNetworkAgent):
 
     def __init__(self,
                  env,
-                 save_model_path=None,
+                 save_model_dir=None,
                  batch_size=16,
-                 epsilon_scheduler=ConstEpsilonScheduler(0.1),
+                 epsilon_scheduler=utils.ConstEpsilonScheduler(0.1),
                  learning_rate_scheduler=None,
                  policy='eps_greedy',
                  experience_replay=True,
-                 size_Q_memory=1024,
+                 size_memory=1024,
                  fixed_target_weights=True,
                  update_period_fixed_target_weights=400,
                  gamma=1,
@@ -38,7 +36,7 @@ class DeepQLearningAgent(NeuralNetworkAgent):
                          learning_rate_scheduler=learning_rate_scheduler,
                          gamma=gamma,
                          self_play=self_play,
-                         save_model_path=save_model_path)
+                         save_model_path=save_model_dir)
 
         if type(env.observation_space) is gym.spaces.discrete.Discrete:
             #self.Q_input_shape = (env.observation_space.n + env.action_space.n, )
@@ -47,7 +45,7 @@ class DeepQLearningAgent(NeuralNetworkAgent):
             self.Q_input_shape = (len(env.observation_space), )
             #self.Q_input_shape = (len(env.observation_space) + env.action_space.n, )
 
-        self.Q = create_Sequential_Dense_net1(
+        self.Q = utils.create_Sequential_Dense_net1(
             input_shape=self.Q_input_shape,
             n_outputs=env.action_space.n,
             layers=7,
@@ -56,7 +54,7 @@ class DeepQLearningAgent(NeuralNetworkAgent):
             lambda_regularization=10**(-4),
         )
 
-        self.starting_learning_rate = 1*10**(-5)
+        self.starting_learning_rate = 5*10**(-6)
 
         optimizer = tf.keras.optimizers.Adam(
             learning_rate=self.starting_learning_rate,
@@ -88,8 +86,16 @@ class DeepQLearningAgent(NeuralNetworkAgent):
 
         # reserve space for the experienced episodes, if desired
         if experience_replay:
-            self.size_Q_memory = size_Q_memory
-            self.Q_memory = np.zeros((size_Q_memory, self.Q_input_shape[0] + self.nb_actions))
+
+            self.memory = utils.NumpyArrayMemory(
+                size=size_memory,
+                input_shape=self.Q_input_shape[0],
+                nb_actions=self.nb_actions,
+                data_dir=self.save_model_path
+            )
+
+            #self.size_Q_memory = size_Q_memory
+            #self.Q_memory = np.zeros((size_Q_memory, self.Q_input_shape[0] + self.nb_actions))
 
         # here, we build a second network that will generate the predictions
         # to create the Q learning target. This is done to create more stability.
@@ -98,23 +104,8 @@ class DeepQLearningAgent(NeuralNetworkAgent):
             self.Q_fixed_weights = tf.keras.models.clone_model(self.Q)
             self.update_period_fixed_target_weights = update_period_fixed_target_weights
 
-    def get_batch(self):
-        """
-        deprecated
-        """
-        memory = self.Q_memory[:self.episodes]
-        batch_size = max(1, min(self.batch_size, self.e))
-
-        if self.episodes > self.size_Q_memory:  # memory is filled
-            indices = np.random.choice(range(self.size_Q_memory), self.batch_size)
-            x_train = self.Q_memory[:, :-1][indices]
-            y_train = self.Q_memory[:, -1][indices]
-            return x_train, y_train, True
-
-        else:  # memory is too small
-            return None, None, False
-
     def training_data(self):
+        # TODO deprecated
         # one Q_memory row consists of [state, Qvalues(dim=nb_actions)]
         states = self.Q_memory[:, :-self.nb_actions]
         targets = self.Q_memory[:, -self.nb_actions:]
@@ -123,9 +114,11 @@ class DeepQLearningAgent(NeuralNetworkAgent):
 
     def update_Q(self, batch_size=128, episodes=2):
 
-        if self.memory_ready():
+        if self.memory.ready():
+        #f self.memory_ready():
 
-            states, targets = self.training_data()
+            states, targets = self.memory.complete_training_data()
+            #states, targets = self.training_data()
 
             fit_result = self.Q.fit(
                 x=states,
@@ -186,7 +179,7 @@ class DeepQLearningAgent(NeuralNetworkAgent):
 
             action = self.policy(state)
 
-            if self.self_play and self.episodes > self.size_Q_memory:
+            if self.self_play and self.episodes > self.memory.size:
                 opponent_action = self.get_ideal_opponent_action
             else:
                 opponent_action = self.get_random_action
@@ -204,7 +197,9 @@ class DeepQLearningAgent(NeuralNetworkAgent):
                 qvalues = self.predict(state, network='Q')
                 qvalues[action] = target
 
-                self.Q_memory[self.episodes % self.size_Q_memory] = list(state) + list(qvalues)
+                self.memory.add(state, qvalues)
+
+                #self.Q_memory[self.episodes % self.memory.size] = list(state) + list(qvalues)
 
             state = next_state
 
@@ -302,30 +297,9 @@ class DeepQLearningAgent(NeuralNetworkAgent):
 
         print(f'did {n_episodes=}, {train=}, {total_reward=} (including negative rewards), win %: {win_percentage:.2f}')
 
-        if self.autosave:
-            self.save_model('Q', path=self.save_model_path)
 
         return total_reward
 
-    def train(self, n_episodes):
-        """
-        Train the agent n_episodes
-        """
-        self.policy = 'eps_greedy'
-
-        if self.self_play:
-            self.opponent_policy = 'greedy'
-        else:
-            self.opponent_policy = 'random'
-
-        self._loop(n_episodes, train=True)
-
-    def play(self, n_episodes, opponent_policy='random'):
-
-        self.policy = 'greedy'
-        self.opponent_policy = opponent_policy
-        
-        return self._loop(n_episodes, train=False)
 
 
 if __name__ == '__main__':

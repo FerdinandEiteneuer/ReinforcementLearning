@@ -67,13 +67,16 @@ if __name__ == '__main__':
 
     model_path = os.path.join(data_path, 'connect4net')
 
-    #decaying_eps_scheduler = DecayingEpsilonScheduler(eps=1, decay_scale=30000, minimum=0.2)
-    linear_decrease = utils.LinearlyDecreasingEpsilonScheduler(eps=1,
-                                                               end_of_decrease=600_000,
-                                                               minimum=0.3)
+    linear_decrease = utils.LinearlyDecreasingEpsilonScheduler(
+        eps=1,
+        end_of_decrease=600_000,
+        minimum=0.3
+    )
 
-    lr_scheduler = utils.decaying_learning_rate_scheduler(decay_factor=0.96,
-                                                          minimum=10**(-7))
+    lr_scheduler = utils.decaying_learning_rate_scheduler(
+        decay_factor=0.96,
+        minimum=10**(-7)
+    )
 
 
     agent = DeepQLearningAgent(
@@ -82,11 +85,11 @@ if __name__ == '__main__':
         epsilon_scheduler=linear_decrease,
         learning_rate_scheduler=lr_scheduler,
         experience_replay=True,
-        size_Q_memory=size_memory,
+        size_memory=size_memory,
         fixed_target_weights=True,
         update_period_fixed_target_weights=update_period,
         self_play=True,
-        save_model_path=model_path,
+        save_model_dir=model_path,
     )
 
     try:

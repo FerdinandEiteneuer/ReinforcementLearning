@@ -8,3 +8,4 @@ def export(defn):
 from .neural_networks import *
 from .policy import *
 from .schedulers import *
+from .memory import *

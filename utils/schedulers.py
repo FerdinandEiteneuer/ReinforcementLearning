@@ -16,7 +16,6 @@ def decaying_learning_rate_scheduler(decay_factor=0.99, minimum=10**(-7)):
         return max(minimum, lr * decay_factor)
     return lr_scheduler
 
-
 @export
 class EpsilonScheduler:
 

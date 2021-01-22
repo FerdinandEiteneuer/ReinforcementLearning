@@ -88,7 +88,7 @@ def main():
     agent = DeepQLearningAgent(
         env=env,
         policy='greedy',
-        save_model_path=model_path,
+        save_model_dir=model_path,
     )
 
     agent.load_model(model_path, load_memory=False)

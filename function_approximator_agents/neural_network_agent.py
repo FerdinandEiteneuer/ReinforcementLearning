@@ -52,7 +52,10 @@ class NeuralNetworkAgent:
             self.opponent_policy = 'greedy'
         else:
             self.opponent_policy = 'random'
-    
+
+    """
+    POLICY
+    """
     @property
     def policy(self):
         return self._policy
@@ -86,15 +89,6 @@ class NeuralNetworkAgent:
         else:
             raise ValueError(f'Opponent policy was {policy}, but must be "greedy" or "random".')
 
-    @save_model_on_KeyboardInterrupt
-    def train_and_play(self, train=8000, play=1000, repeat=1, funcs=[]):
-        for i in range(repeat):
-            print(f'\ntrain/play loop #{i+1}')
-            self.train(n_episodes=train)
-            self.play(n_episodes=play)
-
-            for func in funcs:
-                func(self)
 
     def get_random_action(self, *args):
         """
@@ -122,6 +116,9 @@ class NeuralNetworkAgent:
         else:
             return self.get_greedy_action(state)
 
+    """
+    MODEL
+    """
     def predict(self, state, network):
         """
         Evaluates the state for the given network.
@@ -240,6 +237,9 @@ class NeuralNetworkAgent:
         q_max, _ = self.analyse_maxQ(state, network)
         return q_max
 
+    """
+    MEMORY
+    """
     def save_model(self, network, path=None, overwrite=True, save_memory=True):
         if path is None:
             path = self.save_model_path
@@ -260,7 +260,7 @@ class NeuralNetworkAgent:
             model.save(path, overwrite=overwrite)
 
         if save_memory:
-            self.save_memory(path)
+            self.memory.save()
 
     def load_model(self, path, load_memory=True):
 
@@ -268,20 +268,40 @@ class NeuralNetworkAgent:
         self.Q_fixed_weights = self.Q
 
         if load_memory:
-            self.load_memory(path)
+            self.memory.load()
 
-    def save_memory(self, path):
-        npy_path = os.path.join(path, 'memory.npy')
-        np.save(file=npy_path, arr=self.Q_memory)
+    """
+    TRAINING
+    """
+    @save_model_on_KeyboardInterrupt
+    def train_and_play(self, train=8000, play=1000, repeat=1, funcs=[]):
+        for i in range(repeat):
+            print(f'\ntrain/play loop #{i+1}')
+            self.train(n_episodes=train)
+            self.play(n_episodes=play)
 
-    def load_memory(self, path):
-        npy_path = os.path.join(path, 'memory.npy')
+            if self.autosave:
+                self.save_model('Q', path=self.save_model_path)
 
-        try:
-            self.Q_memory = np.load(npy_path)
-        except FileNotFoundError as e:
-            print(f'Memory could net be loaded:', e)
+            for func in funcs:
+                func(self)
 
-    def memory_ready(self):
-        assert self.Q_memory is not None
-        return np.any(self.Q_memory[-1] != 0)
+    def train(self, n_episodes):
+        """
+        Train the agent n_episodes
+        """
+        self.policy = 'eps_greedy'
+
+        if self.self_play:
+            self.opponent_policy = 'greedy'
+        else:
+            self.opponent_policy = 'random'
+
+        self._loop(n_episodes, train=True)
+
+    def play(self, n_episodes, opponent_policy='random'):
+
+        self.policy = 'greedy'
+        self.opponent_policy = opponent_policy
+
+        return self._loop(n_episodes, train=False)
