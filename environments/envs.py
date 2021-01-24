@@ -1,8 +1,6 @@
-# external libraries
 import numpy as np
 import gym
 
-# this package
 from utils import export
 
 grid1 = {

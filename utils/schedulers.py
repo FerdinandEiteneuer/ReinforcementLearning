@@ -3,10 +3,8 @@ epsilon (exploration rate) schedulers.
 TODO: make base scheduler class for all decayables, like learning rates?
 """
 
-# external libraries
 import numpy as np
 
-# this package
 from utils import export
 
 

@@ -1,10 +1,7 @@
-#external libraries
 import numpy as np
 
-# standard libraries
 import sys
 
-# this package
 from tabular_agents import TabularAgent
 
 

@@ -1,19 +1,14 @@
-# external libraries
 import numpy as np
 import tensorflow as tf
+from tqdm import tqdm
 
-# standard libraries
-import os
 import contextlib
+from collections import deque
 
-# this package
-from utils import (export,
-                   save_model_on_KeyboardInterrupt,
-                   is_valid_policy_function,
-                   decaying_learning_rate_scheduler)
+import utils
 
 
-@export
+@utils.export
 class NeuralNetworkAgent:
 
     def __init__(self, env,
@@ -71,7 +66,7 @@ class NeuralNetworkAgent:
                 self._policy = self.get_epsilon_greedy_action
             else:
                 raise ValueError(f'{policy=}, but only "greedy", "eps_greedy" or "random" are valid.')
-        elif is_valid_policy_function(policy):  # custom policies
+        elif utils.is_valid_policy_function(policy):  # custom policies
             self._policy = policy
         else:
             raise ValueError(f'Object {policy=} is not a proper policy function.')
@@ -117,7 +112,7 @@ class NeuralNetworkAgent:
             return self.get_greedy_action(state)
 
     """
-    MODEL
+    USING MODEL
     """
     def predict(self, state, network):
         """
@@ -238,7 +233,7 @@ class NeuralNetworkAgent:
         return q_max
 
     """
-    MEMORY
+    SAVING MODEL
     """
     def save_model(self, network, path=None, overwrite=True, save_memory=True):
         if path is None:
@@ -257,7 +252,8 @@ class NeuralNetworkAgent:
 
         print('saving model to:', path)
         with contextlib.redirect_stderr(None):  # do not clutter output
-            model.save(path, overwrite=overwrite)
+            with contextlib.redirect_stdout(None):
+                model.save(path, overwrite=overwrite)
 
         if save_memory:
             self.memory.save()
@@ -273,7 +269,7 @@ class NeuralNetworkAgent:
     """
     TRAINING
     """
-    @save_model_on_KeyboardInterrupt
+    @utils.save_model_on_KeyboardInterrupt
     def train_and_play(self, train=8000, play=1000, repeat=1, funcs=[]):
         for i in range(repeat):
             print(f'\ntrain/play loop #{i+1}')
@@ -281,6 +277,7 @@ class NeuralNetworkAgent:
             self.play(n_episodes=play)
 
             if self.autosave:
+                print('AUTOSAVING ....')
                 self.save_model('Q', path=self.save_model_path)
 
             for func in funcs:
@@ -305,3 +302,64 @@ class NeuralNetworkAgent:
         self.opponent_policy = opponent_policy
 
         return self._loop(n_episodes, train=False)
+
+    def _loop(self, n_episodes, train=True):
+        """
+        Main training or evaluation loop.
+        """
+        rewards_ = deque(maxlen=1000)
+        wins = 0
+
+        ema_reward = 0
+
+        mean_loss = 0
+
+        beta = 0.996
+        total_reward = 0
+
+        with tqdm(total=n_episodes, postfix='T=') as t:
+
+            for k in range(n_episodes):
+
+                if train:
+                    info = self.train_one_episode()
+                else:
+                    info = self.play_one_episode()
+
+                postfix = ''
+
+                if reward := info.get('last_reward'):
+                    rewards_.append(reward)
+                    total_reward += reward
+
+                    try:
+                        if reward == self.env.reward_range[-1]:  # e.g reward_range = (-1, 1), where 1 is the win
+                            wins += 1
+                        postfix += f'wins={100*wins/(k+1):.2f}%, '
+                    except AttributeError:
+                        postfix += f'wins=n/a, '
+                        wins = None
+
+                    ema_reward = beta * ema_reward + (1 - beta) * reward
+                    postfix += f'reward={ema_reward/(1-beta**(k+1)):.2f}, '
+                else:
+                    postfix += 'HKAHAKAKKEGHFIEFAG'
+
+                mean_loss = info.get('mean_loss') or mean_loss
+                postfix += f'mean loss={mean_loss:.3f}, '
+
+                if self.eps is not None:
+                    postfix += f'eps={self.eps:.2e} '
+
+                t.postfix = postfix
+                t.update()
+
+        try:
+            win_percentage = wins / n_episodes * 100
+        except TypeError:
+            win_percentage = 'n/a'
+
+        print(f'did {n_episodes=}, {train=}, {total_reward=} (including negative rewards), win %: {win_percentage:.2f}')
+
+
+        return total_reward

@@ -1,15 +1,13 @@
-# external libraries
 import numpy as np
 from gym.spaces.discrete import Discrete
 from gym.spaces.tuple import Tuple
 
-# standard libraries
+
 import contextlib
 with contextlib.redirect_stdout(None):
     # don't print annoying gfootball warning
     from kaggle_environments import make
 
-# this package
 from utils import export
 
 

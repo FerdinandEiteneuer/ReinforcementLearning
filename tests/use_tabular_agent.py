@@ -1,11 +1,9 @@
-# external libraries
 import gym
 import plotly
 import plotly.graph_objects as go
 import numpy as np
 np.set_printoptions(precision=3, suppress=True)
 
-# this package
 from environments import KaggleTicTacToe, KaggleConnectX
 import tabular_agents
 

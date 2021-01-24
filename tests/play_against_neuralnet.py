@@ -1,13 +1,10 @@
-# standard libraries
 import sys
 import os
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
-# external libraries
 import numpy as np
 
-# this package
 from environments import KaggleTicTacToe, KaggleConnectX
 from function_approximator_agents import DeepQLearningAgent
 

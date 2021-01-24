@@ -1,4 +1,3 @@
-# external libraries
 import numpy as np
 import gym
 from tqdm import tqdm

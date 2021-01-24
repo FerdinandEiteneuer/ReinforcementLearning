@@ -1,11 +1,9 @@
 """
 Memory
 """
-# external libraries
 import numpy as np
 import os
 
-# this package
 from utils import export
 
 

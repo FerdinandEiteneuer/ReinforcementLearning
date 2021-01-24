@@ -1,4 +1,3 @@
-# external libraries
 import tensorflow as tf
 import numpy as np
 np.set_printoptions(precision=3)
@@ -7,7 +6,6 @@ np.set_printoptions(precision=3)
 import random
 import os
 
-# this package
 import utils
 from environments import KaggleTicTacToe, KaggleConnectX
 from function_approximator_agents import DeepQLearningAgent
@@ -51,20 +49,17 @@ if __name__ == '__main__':
 
     #set_random_seeds(123)
 
+    # ENVIRONMENT
     tictactoe = KaggleTicTacToe()
-    connect4 = KaggleConnectX(rows=6, columns=7, inarow=4)
     connect3 = KaggleConnectX(rows=4, columns=4, inarow=3)
-
+    connect4 = KaggleConnectX(rows=6, columns=7, inarow=4)
 
     env = connect4
 
-    starting_position = np.zeros((1, 9))
-
+    # CONFIG DQL AGENT
     size_memory = 8*512
     update_period = 3*512
-
     data_path = os.path.join(os.environ['HOME'], 'rl', 'reinforcement_learning', 'data')
-
     model_path = os.path.join(data_path, 'connect4net')
 
     linear_decrease = utils.LinearlyDecreasingEpsilonScheduler(
@@ -77,7 +72,6 @@ if __name__ == '__main__':
         decay_factor=0.96,
         minimum=10**(-7)
     )
-
 
     agent = DeepQLearningAgent(
         env=env,
@@ -96,6 +90,7 @@ if __name__ == '__main__':
         agent.load_model(agent.save_model_path, load_memory=True)
     except Exception as e:
         print('-COULD NOT LOAD AGENT-')
+
     #for i in range(10): agent.play(5000, opponent_policy='random')
     #sys.exit()
 
@@ -111,7 +106,6 @@ if __name__ == '__main__':
                             #evaluate_testcases
                             ]
                          )
-
 
     agent.save_model('Q', agent.save_model_path, overwrite=True, save_memory=True)
 

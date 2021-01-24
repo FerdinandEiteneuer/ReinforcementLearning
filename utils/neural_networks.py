@@ -1,6 +1,9 @@
 """
 utilities for the neural network agent
 """
+import contextlib
+from functools import wraps
+
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout
 from tensorflow.keras.regularizers import l2
@@ -51,17 +54,19 @@ def save_model_on_KeyboardInterrupt(func):
     """
     Decorator intended to save the neural network on KeyboardInterrupt
     """
-    def save_model(*args, **kwargs):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
         except KeyboardInterrupt:
             try:
-                print('\nStopped Agent: Caught KeyboardInterrupt!')
+                print('\nSaving Agent: Caught KeyboardInterrupt!')
                 agent = args[0]
                 path = agent.save_model_path
                 agent.save_model(path=path, network='Q', overwrite=True)
             except Exception as e:
                 print('saving failed:', e)
                 raise
-    return save_model
+
+    return wrapper
 
