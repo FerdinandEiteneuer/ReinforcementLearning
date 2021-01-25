@@ -44,6 +44,8 @@ class KaggleEnvWrapper():
     """
     def __init__(self, dtype_state=np.ndarray, opponent_policy='random'):
 
+        self.infos_ = {'equal': 0, 'notequal': 0}
+
         self.opponent_policy = opponent_policy
 
         supported_types = [np.ndarray, tuple]
@@ -127,48 +129,16 @@ class KaggleEnvWrapper():
             action_opp = self.get_random_action()
         else:
             action_opp = action_opponent(state)  # calculate the opponents action
+            """
+            if hasattr(self, 'AGENT'):
+                alt_action = self.AGENT.get_ideal_opponent_action2(state)
+                if alt_action == action_opp:
+                    self.infos_['equal'] += 1
+                else:
+                    self.infos_['notequal'] += 1
+            """
 
         state, reward, terminal, info = self.execute_opponent_action(action_opp)
-        state = self._transform(self.state)
-        return state, reward, terminal, info
-
-    def step_DEPRECATED(self, action, action_opponent=None):
-        """
-        Deprecated
-        """
-        action = int(action)
-        #print('EXECUTING PLAYER STEP')
-        self.state, reward, terminal, info = self.parse_observation(self.env.step([action, None]))
-
-        if not info['valid']:
-            print(action, terminal, reward, self.state, info)
-            raise RuntimeError('player chose non valid action')
-        if info['player_active']:
-            print(action, terminal, reward, self.state, info)
-            raise RuntimeError('after player moved, he is not in state inactive')
-
-        if terminal:
-            state = self._transform(self.state)
-            return state, reward, terminal, info  # the player won
-
-        if action_opponent is None:
-            if self.opponent_policy == 'random':
-                action_opponent = self.get_random_action()
-            elif self.opponent_policy == 'first_allowed':
-                action_opponent = int(self.get_allowed_actions()[0])
-            else:
-                raise ValueError('no opponent action or strategy provided')
-        elif action_opponent:
-            action_opp = action_opponent(self.state)
-
-        #print('EXECUTING OPPONENT STEP')
-        observation = self.env.step([None, action_opp])
-
-        self.state, reward, terminal, info = self.parse_observation(observation)
-        if not info['valid']:
-            print(action, action_opponent, reward, self.state, info)
-            raise RuntimeError('invalid opponent action')
-
         state = self._transform(self.state)
         return state, reward, terminal, info
 
@@ -220,7 +190,6 @@ class KaggleConnectX(KaggleEnvWrapper):
         self.action_space = Discrete(columns)
         self.action_space.sample = self.get_random_action
 
-        #self.observation_space = Discrete(rows * columns)
         self.observation_space = Tuple(rows * columns * [Discrete(3)])
 
         self.rows = rows

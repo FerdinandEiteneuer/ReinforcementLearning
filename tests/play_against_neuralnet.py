@@ -76,7 +76,7 @@ def main():
         env = KaggleTicTacToe()
         model_path = os.path.join(datapath, 'tictactoe_network')
     elif game == 'connect4':
-        env = KaggleConnectX(rows=6, columns=7, inarow=4)
+        env = KaggleConnectX(rows=5, columns=5, inarow=4)
         model_path = os.path.join(datapath, 'connect4net')
     elif game == 'connect3':
         env = KaggleConnectX(rows=4, columns=4, inarow=3)

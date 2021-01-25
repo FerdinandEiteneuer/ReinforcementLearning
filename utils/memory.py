@@ -16,7 +16,8 @@ class NumpyArrayMemory:
     def __init__(self, size, input_shape, nb_actions, data_dir):
 
         self.data_dir = data_dir
-        self.memory_path = os.path.join(data_dir, 'memory.npy')
+        if data_dir is not None:
+            self.memory_path = os.path.join(data_dir, 'memory.npy')
 
         self.size = size
         self.input_shape = input_shape

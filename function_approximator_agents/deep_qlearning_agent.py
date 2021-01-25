@@ -5,47 +5,56 @@ import gym
 from .neural_network_agent import NeuralNetworkAgent
 import utils
 
-
 @utils.export
 class DeepQLearningAgent(NeuralNetworkAgent):
 
-    def __init__(self,
-                 env,
-                 save_model_dir=None,
-                 batch_size=16,
-                 epsilon_scheduler=utils.ConstEpsilonScheduler(0.1),
-                 learning_rate_scheduler=None,
-                 policy='eps_greedy',
-                 experience_replay=True,
-                 size_memory=1024,
-                 fixed_target_weights=True,
-                 update_period_fixed_target_weights=400,
-                 gamma=1,
-                 self_play=False):
+    def __init__(
+            self,
+            env,
+            Q=None,
+            save_model_dir=None,
+            batch_size=16,
+            epsilon_scheduler=utils.ConstEpsilonScheduler(0.1),
+            learning_rate_scheduler=None,
+            policy='eps_greedy',
+            experience_replay=True,
+            size_memory=1024,
+            fixed_target_weights=True,
+            update_period_fixed_target_weights=400,
+            gamma=1,
+            self_play=False,
+            starting_learning_rate=2*10**(-5),
+            success_condition=None,
+        ):
 
-        super().__init__(env=env,
-                         policy=policy,
-                         epsilon_scheduler=epsilon_scheduler,
-                         learning_rate_scheduler=learning_rate_scheduler,
-                         gamma=gamma,
-                         self_play=self_play,
-                         save_model_path=save_model_dir)
-
-        if type(env.observation_space) is gym.spaces.discrete.Discrete:
-            self.Q_input_shape = (env.observation_space.n, )
-        elif type(env.observation_space) is gym.spaces.tuple.Tuple:
-            self.Q_input_shape = (len(env.observation_space), )
-
-        self.Q = utils.create_Sequential_Dense_net1(
-            input_shape=self.Q_input_shape,
-            n_outputs=env.action_space.n,
-            layers=10,
-            neurons=256,
-            p_dropout=0.1,
-            lambda_regularization=10**(-4),
+        super().__init__(
+            env=env,
+            policy=policy,
+            epsilon_scheduler=epsilon_scheduler,
+            learning_rate_scheduler=learning_rate_scheduler,
+            gamma=gamma,
+            self_play=self_play,
+            save_model_dir=save_model_dir,
+            size_memory=size_memory,
+            experience_replay=experience_replay,
+            success_condition=success_condition,
         )
 
-        self.starting_learning_rate = 5*10**(-6)
+        if Q is not None:
+            self.Q = Q
+        else:
+            self.Q = utils.create_sequential_dense_net(
+                input_shape=self.Q_input_shape,
+                n_outputs=self.nb_actions,
+                hidden_layers=7,
+                neurons_per_layer=128,
+                p_dropout=0.1,
+                lambda_regularization=10**(-4),
+                hidden_activation_function='relu',
+                final_activation_function='relu'
+            )
+
+        self.starting_learning_rate = starting_learning_rate
 
         optimizer = tf.keras.optimizers.Adam(
             learning_rate=self.starting_learning_rate,
@@ -56,12 +65,14 @@ class DeepQLearningAgent(NeuralNetworkAgent):
         )
 
         #self.loss = 'mean_absolute_error'
-        #self.loss = 'mean_squared_error'
-        self.loss = tf.keras.losses.Huber()
+        self.loss = 'mean_squared_error'
+        #self.loss = tf.keras.losses.Huber()
 
         self.callbacks = []
         if self.learning_rate_scheduler:
-            scheduler = tf.keras.callbacks.LearningRateScheduler(self.learning_rate_scheduler)
+            scheduler = tf.keras.callbacks.LearningRateScheduler(
+                self.learning_rate_scheduler
+            )
             self.callbacks.append(scheduler)
 
         self.Q.compile(
@@ -69,35 +80,15 @@ class DeepQLearningAgent(NeuralNetworkAgent):
             loss=self.loss,
         )
 
-        self.episodes = 0
-
-
-        self.experience_replay = experience_replay
-        self.fixed_target_weights = fixed_target_weights
-
         # reserve space for the experienced episodes, if desired
-        if experience_replay:
-
-            self.memory = utils.NumpyArrayMemory(
-                size=size_memory,
-                input_shape=self.Q_input_shape[0],
-                nb_actions=self.nb_actions,
-                data_dir=self.save_model_path
-            )
 
         # here, we build a second network that will generate the predictions
         # to create the Q learning target. This is done to create more stability.
+        self.fixed_target_weights = fixed_target_weights
         if fixed_target_weights:
             self.Q_fixed_weights = tf.keras.models.clone_model(self.Q)
             self.update_period_fixed_target_weights = update_period_fixed_target_weights
 
-    def training_data(self):
-        # TODO deprecated
-        # one Q_memory row consists of [state, Qvalues(dim=nb_actions)]
-        states = self.Q_memory[:, :-self.nb_actions]
-        targets = self.Q_memory[:, -self.nb_actions:]
-
-        return states, targets
 
     def update_Q(self, batch_size=128, episodes=2):
 
@@ -141,6 +132,8 @@ class DeepQLearningAgent(NeuralNetworkAgent):
 
     def train_one_episode(self):
         # initialize
+
+
         self.episodes += 1
 
         state = self.env.reset()
@@ -148,14 +141,16 @@ class DeepQLearningAgent(NeuralNetworkAgent):
 
         fit_info = None
         terminal = False
+        episode_length = 0
+        total_reward = 0
 
         if self.fixed_target_weights:
             if self.episodes % self.update_period_fixed_target_weights == 0:
                 self.update_fixed_target_weights()
 
         # train the neural network
-        if self.episodes % 20 == 0:
-            fit_info = self.update_Q(episodes=20)
+        if self.episodes % 10 == 0:
+            fit_info = self.update_Q(episodes=4)
             if fit_info:
                 history = fit_info.history
                 losses.extend(history['loss'])
@@ -164,34 +159,40 @@ class DeepQLearningAgent(NeuralNetworkAgent):
 
         while not terminal:
 
+            #if self.episodes % 5 == 0:
+            #   self.env.render()
             action = self.policy(state)
 
-            if self.self_play and self.episodes > self.memory.size:
-                opponent_action = self.get_ideal_opponent_action
+            if self.self_play:
+                next_state, reward, terminal, info = self.env.step(action, self.opponent_policy)
             else:
-                opponent_action = self.get_random_action
-
-            next_state, reward, terminal, info = self.env.step(action, opponent_action)
+                next_state, reward, terminal, info = self.env.step(action)
 
             if not terminal:
-                maxQ = self.get_maxQ(next_state, network='Q_fixed_weights')
+                network = 'Q_fixed_weights' if self.fixed_target_weights else 'Q'
+                maxQ = self.get_maxQ(next_state, network=network)
                 target = reward + self.gamma * maxQ
             else:
                 target = reward
 
             if self.experience_replay:
-
                 qvalues = self.predict(state, network='Q')
                 qvalues[action] = target
 
                 self.memory.add(state, qvalues)
 
-                #self.Q_memory[self.episodes % self.memory.size] = list(state) + list(qvalues)
-
             state = next_state
+            episode_length += 2
+            total_reward += reward
 
         mean_loss = np.mean(losses) if len(losses) > 0 else None
-        train_info = {'mean_loss': mean_loss, 'last_reward': reward}
+
+        train_info = {
+            'mean_loss': mean_loss,
+            'last_reward': reward,
+            'episode_length': episode_length,
+            'total_reward': total_reward,
+        }
 
         return train_info
 
@@ -206,17 +207,31 @@ class DeepQLearningAgent(NeuralNetworkAgent):
         state = self.env.reset()
         episode_memory = []
 
+        episode_length = 0
+        total_reward = 0
+
         while not terminal:
             action = self.policy(state)
 
             # episode_memory.append((state, action, reward, terminal))
 
-            next_state, reward, terminal, info = self.env.step(action, self.opponent_policy)
+            if self.self_play:
+                next_state, reward, terminal, info = self.env.step(action, self.opponent_policy)
+                episode_length += 2
+            else:
+                next_state, reward, terminal, info = self.env.step(action)
+                episode_length += 1
 
+            total_reward += reward
             state = next_state
 
-        info['last_reward'] = reward
-        info['episode_memory'] = episode_memory
+        info = {
+            'last_reward': reward,
+            'total_reward': total_reward,
+            'episode_memory': episode_memory,
+            'episode_length': episode_length,
+        }
+
         return info
 
 

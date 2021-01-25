@@ -2,7 +2,6 @@ import tensorflow as tf
 import numpy as np
 np.set_printoptions(precision=3)
 
-# standard library
 import random
 import os
 
@@ -48,23 +47,22 @@ def set_random_seeds(n):
 if __name__ == '__main__':
 
     #set_random_seeds(123)
-
     # ENVIRONMENT
     tictactoe = KaggleTicTacToe()
     connect3 = KaggleConnectX(rows=4, columns=4, inarow=3)
-    connect4 = KaggleConnectX(rows=6, columns=7, inarow=4)
+    connect4 = KaggleConnectX(rows=5, columns=5, inarow=4)
 
     env = connect4
 
     # CONFIG DQL AGENT
-    size_memory = 8*512
-    update_period = 3*512
+    size_memory = 4*1024
+    update_period = 4*1024
     data_path = os.path.join(os.environ['HOME'], 'rl', 'reinforcement_learning', 'data')
     model_path = os.path.join(data_path, 'connect4net')
 
     linear_decrease = utils.LinearlyDecreasingEpsilonScheduler(
         eps=1,
-        end_of_decrease=100_000,
+        end_of_decrease=10_000,
         minimum=0.3
     )
 

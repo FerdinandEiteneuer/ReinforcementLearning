@@ -1,11 +1,33 @@
 import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
+import gym
 
 import contextlib
 from collections import deque
+from functools import wraps
 
 import utils
+
+
+def return_numpy_array_on_step(env):
+    _old_step = env.step
+
+    def new_step(action):
+        next_state, *args = _old_step(action)
+        next_state = np.array([next_state])
+        return next_state, *args
+    return new_step
+
+
+def return_numpy_array_on_reset(env):
+    _old_reset = env.reset
+
+    @wraps(_old_reset)
+    def new_reset():
+        next_state = np.array([_old_reset()])
+        return next_state
+    return new_reset
 
 
 @utils.export
@@ -17,10 +39,20 @@ class NeuralNetworkAgent:
                  policy,
                  gamma,
                  self_play,
-                 save_model_path=None):
+                 experience_replay,
+                 size_memory,
+                 save_model_dir=None,
+                 success_condition=None):
 
         self.env = env
-        self.nb_actions = self.env.action_space.n
+
+        self.Q_input_shape = utils.get_input_shape(env)
+        self.nb_actions = utils.get_output_neurons(env)
+
+        if type(env.observation_space) is gym.spaces.discrete.Discrete:
+            env.step = return_numpy_array_on_step(env)
+            env.reset = return_numpy_array_on_reset(env)
+
         self.env.dtype_state = np.ndarray
 
         self.epsilon_scheduler = epsilon_scheduler
@@ -28,18 +60,31 @@ class NeuralNetworkAgent:
 
         self.eps = None
         self.gamma = gamma
+        self.episodes = 0
 
         self.default_policy = policy
         self.self_play = self_play
 
-        self.save_model_path = save_model_path
-        self.autosave = True
-
+        self.save_model_dir = save_model_dir
+        if save_model_dir is not None:
+            self.autosave = True
+        else:
+            self.autosave = False
 
         # neural networks
         self.Q = None
         self.Q_fixed_weights = None
-        self.Q_memory = np.zeros((1, 1))
+
+        # memory
+        self.experience_replay = experience_replay
+        if experience_replay:
+
+            self.memory = utils.NumpyArrayMemory(
+                size=size_memory,
+                input_shape=self.Q_input_shape[0],
+                nb_actions=self.nb_actions,
+                data_dir=self.save_model_dir
+            )
 
         self.policy = policy
 
@@ -47,6 +92,9 @@ class NeuralNetworkAgent:
             self.opponent_policy = 'greedy'
         else:
             self.opponent_policy = 'random'
+
+        if callable(success_condition):
+            self.success_condition = success_condition
 
     """
     POLICY
@@ -80,7 +128,7 @@ class NeuralNetworkAgent:
         if policy == 'random':
             self._opponent_policy = self.get_random_action
         elif policy == 'greedy':
-            self._opponent_policy = self.get_ideal_opponent_action
+            self._opponent_policy = self.get_ideal_opponent_action2
         else:
             raise ValueError(f'Opponent policy was {policy}, but must be "greedy" or "random".')
 
@@ -190,6 +238,27 @@ class NeuralNetworkAgent:
         self.env.env = env_original
         return min_max_action
 
+    def get_ideal_opponent_action2(self, s_intermediate):
+        q_min, action_min = self.analyse_min_Q(s_intermediate)
+        return action_min
+
+    def analyse_min_Q(self, s_intermediate, network='Q'):
+
+        allowed_actions = self.get_allowed_actions(s_intermediate)
+        qs = self.predict(s_intermediate, 'Q')
+
+        action_min = 0
+        q_min = + np.inf
+
+        for action in allowed_actions:
+
+            if qval := qs[action] < q_min:
+                q_min = qval
+                action_min = action
+
+        return q_min, action_min
+
+
     def get_allowed_actions(self, state=None):
         """
         Returns all allowed actions.
@@ -237,7 +306,7 @@ class NeuralNetworkAgent:
     """
     def save_model(self, network, path=None, overwrite=True, save_memory=True):
         if path is None:
-            path = self.save_model_path
+            path = self.save_model_dir
         if path is None:
             raise ValueError('no path given')
 
@@ -248,7 +317,7 @@ class NeuralNetworkAgent:
             print(f'warning: could not find {network=}, using \'Q\' instead')
             model = self.Q
 
-        self.save_model_path = path
+        self.save_model_dir = path
 
         print('saving model to:', path)
         with contextlib.redirect_stderr(None):  # do not clutter output
@@ -269,16 +338,16 @@ class NeuralNetworkAgent:
     """
     TRAINING
     """
-    @utils.save_model_on_KeyboardInterrupt
+    #@utils.save_model_on_KeyboardInterrupt
     def train_and_play(self, train=8000, play=1000, repeat=1, funcs=[]):
+
         for i in range(repeat):
             print(f'\ntrain/play loop #{i+1}')
             self.train(n_episodes=train)
             self.play(n_episodes=play)
 
             if self.autosave:
-                print('AUTOSAVING ....')
-                self.save_model('Q', path=self.save_model_path)
+                self.save_model('Q', path=self.save_model_dir)
 
             for func in funcs:
                 func(self)
@@ -307,15 +376,19 @@ class NeuralNetworkAgent:
         """
         Main training or evaluation loop.
         """
-        rewards_ = deque(maxlen=1000)
+        rewards_ = deque(maxlen=1000)  # last reward of episode
+        total_rewards_ = deque(maxlen=1000)  # total reward of episode
         wins = 0
 
         ema_reward = 0
+        bias_adjusted_ema_reward = 0
 
         mean_loss = 0
 
         beta = 0.996
         total_reward = 0
+        total_avg_reward = 0
+        successes = 0
 
         with tqdm(total=n_episodes, postfix='T=') as t:
 
@@ -326,24 +399,28 @@ class NeuralNetworkAgent:
                 else:
                     info = self.play_one_episode()
 
+                if self.success_condition(info):
+                    successes += 1
+
                 postfix = ''
 
                 if reward := info.get('last_reward'):
                     rewards_.append(reward)
                     total_reward += reward
 
-                    try:
-                        if reward == self.env.reward_range[-1]:  # e.g reward_range = (-1, 1), where 1 is the win
-                            wins += 1
-                        postfix += f'wins={100*wins/(k+1):.2f}%, '
-                    except AttributeError:
-                        postfix += f'wins=n/a, '
-                        wins = None
+                    if reward == self.env.reward_range[-1]:  # e.g reward_range = (-1, 1), where 1 is the win
+                        wins += 1
 
                     ema_reward = beta * ema_reward + (1 - beta) * reward
-                    postfix += f'reward={ema_reward/(1-beta**(k+1)):.2f}, '
-                else:
-                    postfix += 'HKAHAKAKKEGHFIEFAG'
+                    bias_adjusted_ema_reward = ema_reward/(1-beta**(k+1))
+
+                postfix += f'success={100 * successes / (k + 1):.2f}%, '
+                postfix += f'r={bias_adjusted_ema_reward:.2f}, '
+
+                if 'total_reward' in info:
+                    total_reward = info.get('total_reward')
+                    total_rewards_.append(total_reward)
+                    postfix += f'tot r={np.mean(total_rewards_):.2f}, '
 
                 mean_loss = info.get('mean_loss') or mean_loss
                 postfix += f'mean loss={mean_loss:.3f}, '
@@ -355,11 +432,15 @@ class NeuralNetworkAgent:
                 t.update()
 
         try:
-            win_percentage = wins / n_episodes * 100
+            success_percentage = successes / n_episodes * 100
         except TypeError:
-            win_percentage = 'n/a'
+            success_percentage = 'n/a'
 
-        print(f'did {n_episodes=}, {train=}, {total_reward=} (including negative rewards), win %: {win_percentage:.2f}')
+        if self.self_play:
+            print(f'did {n_episodes=}, {train=}, {total_reward=} (including negative rewards), win %: {success_percentage:.2f}\n')
+        else:
+            total_avg_reward = np.mean(total_rewards_) if len(total_rewards_) > 0 else 0
+            print(f'did {n_episodes=}, {train=}, {total_avg_reward=:.2f}, success rate={success_percentage:.2f}%\n')
 
 
         return total_reward
