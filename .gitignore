@@ -162,4 +162,5 @@ cython_debug/
 
 old_files/
 
+*.h5
 data/
